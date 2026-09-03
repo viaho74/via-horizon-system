@@ -1,4 +1,4 @@
-/* =====================================================================
+﻿/* =====================================================================
    البوابة المالية — الرصيد، الفواتير بالضريبة، متابعة السداد
    ===================================================================== */
 window.VH = window.VH || {};
@@ -76,12 +76,12 @@ window.VH = window.VH || {};
         options: [{ v: 'in', t: 'وارد — مبلغ داخل لي' }, { v: 'out', t: 'منصرف — مبلغ خارج مني' }], value: dir
       },
       { name: 'date', label: 'تاريخ الفاتورة', type: 'date', required: true, value: i.date || VH.today() },
-      { name: 'party', label: 'اسم الطرف (العميل / المورّد)', required: true, value: i.party || (deal ? deal.clientName : '') },
+      { name: 'party', label: 'اسم الطرف (العميل / المورّد)', required: true, value: i.party || (deal ? (deal.orgName || deal.clientName) : '') },
       { name: 'partyPhone', label: 'جوال الطرف', type: 'tel', value: i.partyPhone || (deal ? deal.clientPhone : '') },
       { name: 'category', label: 'التصنيف', type: 'select', required: true, options: cats.map(function (c) { return { v: c, t: c }; }), value: i.category },
       {
         name: 'dealId', label: 'ربط بصفقة (اختياري)', type: 'select',
-        options: [{ v: '', t: '— بدون ربط —' }].concat(deals.map(function (d) { return { v: d.id, t: d.code + ' — ' + d.clientName }; })),
+        options: [{ v: '', t: '— بدون ربط —' }].concat(deals.map(function (d) { return { v: d.id, t: d.code + ' — ' + (d.orgName || d.clientName) }; })),
         value: i.dealId || (deal ? deal.id : '')
       },
       { name: 'description', label: 'وصف البند', full: true, value: i.description },
@@ -407,7 +407,7 @@ window.VH = window.VH || {};
     });
     // استكمال الجوال من الصفقات
     VH.store.list('deals').forEach(function (d) {
-      var c = map[(d.clientName || '').trim()];
+      var c = map[(d.orgName || d.clientName || '').trim()];
       if (c && !c.phone) c.phone = d.clientPhone || '';
     });
     var list = Object.keys(map).map(function (k) { return map[k]; })
@@ -435,7 +435,7 @@ window.VH = window.VH || {};
       '<div class="grid grid--3" style="margin-bottom:16px">' +
       VH.statCard({ title: 'إجمالي المستحق على العملاء', value: totDue, cls: 'stat--out', desc: 'لم يُحصّل بعد' }) +
       VH.statCard({ title: 'إجمالي المحصّل', value: totPaid, cls: 'stat--in', desc: 'دخل الحساب فعلياً' }) +
-      VH.statCard({ title: 'عدد العملاء', value: list.length, cls: 'stat--navy', desc: 'لهم فواتير في النظام' }) +
+      VH.statCard({ count: true, title: 'عدد العملاء', value: list.length, cls: 'stat--navy', desc: 'لهم فواتير في النظام' }) +
       '</div>' +
       (list.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>العميل</th><th>الجوال</th><th>الفواتير</th>' +
         '<th>الإجمالي</th><th>المحصّل</th><th>المتبقي</th><th>آخر فاتورة</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>'

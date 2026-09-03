@@ -26,6 +26,11 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
+    // سجل السائقين
+    match /drivers/{driverId} {
+      allow read, write: if signedIn();
+    }
+
     // سجل الأحداث — يُكتب ولا يُعدّل ولا يُحذف
     match /audit/{logId} {
       allow read, create: if signedIn();

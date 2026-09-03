@@ -19,8 +19,10 @@ window.VH = window.VH || {};
     ],
     o: [
       { r: 'o/board', t: 'لوحة العمليات', i: '▤' },
+      { r: 'o/marketing', t: 'تسويق المبيعات', i: '📞' },
       { r: 'o/deals', t: 'الصفقات والعقود', i: '📋' },
       { r: 'o/expenses', t: 'مصاريف التنفيذ', i: '🧾' },
+      { r: 'o/drivers', t: 'السائقون', i: '🧑‍✈️' },
       { r: 'o/team', t: 'الفريق والمهام', i: '👤' },
       { r: 'o/log', t: 'سجل الأحداث', i: '🕘' }
     ]
@@ -75,7 +77,9 @@ window.VH = window.VH || {};
     }
     if (p[1] === 'deal' && p[2]) return VH.ops.deal(p[2]);
     if (p[1] === 'deals') return VH.ops.deals();
+    if (p[1] === 'marketing') return VH.ops.marketing();
     if (p[1] === 'expenses') return VH.ops.expenses();
+    if (p[1] === 'drivers') return VH.ops.drivers();
     if (p[1] === 'team') return VH.ops.team();
     if (p[1] === 'log') return VH.ops.log();
     return VH.ops.board();
@@ -124,6 +128,7 @@ window.VH = window.VH || {};
     all('[data-new-deal]', function () { VH.ops.newDeal(); });
     all('[data-export-deals]', function () { VH.ops.exportDeals(); });
     all('[data-export-exp]', function () { VH.ops.exportExpenses(); });
+    all('[data-export-mk]', function () { VH.ops.exportMarketing(); });
     all('[data-new-inv]', function () { VH.finance.invoiceModal(null, A.render); });
     all('[data-export-inv]', function () { VH.finance.exportInvoices(); });
     all('[data-export-pay]', function () { VH.finance.exportPayments(); });
@@ -137,6 +142,12 @@ window.VH = window.VH || {};
   A.start = function () {
     if (A._booted) { A.render(); return; }
     A._booted = true;
+
+    // ترحيل البيانات المسجّلة قبل إضافة مرحلتَي التسويق وعرض السعر
+    try {
+      var n = VH.store.migrate();
+      if (n) console.info('رُحّلت ' + n + ' صفقة إلى المراحل الجديدة');
+    } catch (e) { console.error('تعذّر الترحيل', e); }
 
     document.querySelectorAll('#portalSwitch .portal__btn').forEach(function (b) {
       b.addEventListener('click', function () {

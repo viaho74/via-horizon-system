@@ -1,4 +1,4 @@
-/* =====================================================================
+﻿/* =====================================================================
    التقارير: الشهري، الضريبي، طباعة الفاتورة، الإعدادات والنسخ الاحتياطي
    ===================================================================== */
 window.VH = window.VH || {};
@@ -234,6 +234,58 @@ window.VH = window.VH || {};
   };
 
   /* =====================================================================
+     طباعة عرض السعر
+     ===================================================================== */
+  R.printQuote = function (d) {
+    var q = d.quote || {};
+    if (!q.total) { VH.toast('لا يوجد عرض سعر لطباعته', 'warn'); return; }
+    var s = VH.store.settings(), c = s.company || {};
+    var rate = VH.num(s.vatRate) || 15;
+    var v = VH.vat(q.total, rate, q.priceVatIncluded !== 'no');
+    var area = document.getElementById('printArea');
+
+    area.innerHTML =
+      '<div class="inv">' +
+        '<div class="inv__top"><img src="assets/img/logo-color.png" alt="">' +
+          '<div style="flex:1"><h2>' + VH.esc(c.name || 'شركة فيا هورايزن') + '</h2>' +
+          '<div style="font-size:.82rem;color:#666">' + VH.esc(c.slogan || '') + '</div>' +
+          (c.taxNumber ? '<div style="font-size:.82rem">الرقم الضريبي: <span class="num">' + VH.esc(c.taxNumber) + '</span></div>' : '') +
+          (c.phone ? '<div style="font-size:.82rem">هاتف: <span class="num">' + VH.esc(c.phone) + '</span></div>' : '') + '</div>' +
+          '<div style="text-align:left"><b style="font-size:1.05rem">عرض سعر</b>' +
+          '<div style="font-size:.85rem">مرجع: <span class="num">' + VH.esc(d.code) + '</span></div>' +
+          '<div style="font-size:.85rem">التاريخ: <span class="num">' + VH.esc(String(q.sentAt || VH.stamp()).slice(0, 10)) + '</span></div></div>' +
+        '</div>' +
+
+        '<h4>بيانات الجهة</h4>' +
+        '<table><tr><th style="width:32%">اسم الجهة</th><td>' + VH.esc(q.orgName || d.orgName) + '</td></tr>' +
+        '<tr><th>الشخص المسؤول</th><td>' + VH.esc(d.clientName || '') + '</td></tr>' +
+        (d.clientPhone ? '<tr><th>الجوال</th><td class="num">' + VH.esc(d.clientPhone) + '</td></tr>' : '') +
+        (d.clientEmail ? '<tr><th>الإيميل</th><td class="num">' + VH.esc(d.clientEmail) + '</td></tr>' : '') +
+        '</table>' +
+
+        '<h4>تفاصيل العرض</h4>' +
+        '<table><thead><tr><th>البيان</th><th style="width:14%">العدد</th><th style="width:14%">الأيام</th>' +
+        '<th style="width:18%">قيمة اليوم</th><th style="width:20%">الإجمالي</th></tr></thead><tbody>' +
+        '<tr><td>' + VH.esc(q.carType) + ' — ' + VH.esc(q.withDriver) + ' — ' + VH.esc(q.city) + '<br>' +
+        '<span style="font-size:.8rem;color:#666">من ' + VH.esc(q.startDate) + ' إلى ' + VH.esc(q.endDate) + '</span></td>' +
+        '<td class="num">' + q.carsCount + '</td><td class="num">' + q.days + '</td>' +
+        '<td class="num">' + VH.fmt(q.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(q.total) + '</td></tr>' +
+        '</tbody></table>' +
+
+        '<div class="inv__tot">' +
+          '<div><span>الإجمالي قبل الضريبة</span><span class="num">' + VH.fmt(v.before) + ' ر.س</span></div>' +
+          '<div><span>ضريبة القيمة المضافة (' + VH.fmt(rate) + '%)</span><span class="num">' + VH.fmt(v.vat) + ' ر.س</span></div>' +
+          '<div class="g"><span>الإجمالي</span><span class="num">' + VH.fmt(v.total) + ' ر.س</span></div>' +
+        '</div>' +
+
+        (q.notes ? '<h4>ملاحظات</h4><p style="font-size:.88rem">' + VH.esc(q.notes) + '</p>' : '') +
+        '<p style="font-size:.8rem;color:#666;margin-top:22px">هذا العرض ساري لمدة 14 يوماً من تاريخه. ' +
+        'أعدّه: ' + VH.esc(q.sentBy || '') + '</p>' +
+      '</div>';
+    setTimeout(function () { window.print(); }, 250);
+  };
+
+  /* =====================================================================
      الإعدادات والنسخ الاحتياطي
      ===================================================================== */
   R.settings = function () {
@@ -449,45 +501,77 @@ window.VH = window.VH || {};
     var e1 = (staff[0] || {}).id || 'khalil', e2 = (staff[1] || {}).id || 'mohammed', e3 = (staff[2] || {}).id || 'moawiyah';
 
     var d1 = {
-      code: 'C-1001', clientName: 'شركة الوفاء للحج والعمرة', clientPhone: '0551234567',
-      negotiationDate: VH.addDays(t, -20), negotiationStatus: 'تم التفاوض', owner: e1, assignee: e2,
+      code: 'C-1001', orgName: 'شركة الوفاء للحج والعمرة', clientName: 'أحمد الزهراني',
+      clientPhone: '0551234567', clientEmail: 'ops@alwafa.example',
+      contactDate: VH.addDays(t, -20), negotiationDate: VH.addDays(t, -20),
+      negotiationStatus: 'تم الاتفاق', owner: e1, assignee: e2,
       stage: 'done', notes: 'نقل معتمرين من المطار للفندق',
-      contract: {
-        carType: 'هيونداي H1', region: 'مكة المكرمة', plate: 'ر ط ن 4471',
-        startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8), days: 5, price: 6900, priceVatIncluded: 'yes'
+      quote: {
+        orgName: 'شركة الوفاء للحج والعمرة', carType: 'هيونداي H1', carsCount: 1, city: 'مكة المكرمة',
+        withDriver: 'بسائق', startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8), days: 5,
+        pricePerCarPerDay: 1380, total: 6900, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'خليل'
       },
-      rental: { officeName: 'مكتب الصفوة لتأجير السيارات', officePhone: '0567778899', rentPerDay: 550, rentTotal: 2750, status: 'تم التعاقد' },
-      driver: { name: 'عبدالله المطيري', phone: '0509988776', dailyWage: 250 },
+      contract: {
+        carType: 'هيونداي H1', carsCount: 1, region: 'مكة المكرمة', withDriver: 'بسائق',
+        startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8), days: 5,
+        pricePerCarPerDay: 1380, price: 6900, priceVatIncluded: 'yes', fromQuote: true
+      },
+      rental: { officeName: 'مكتب الصفوة لتأجير السيارات', officePhone: '0567778899', plate: 'ر ط ن 4471', rentPerDay: 550, rentTotal: 2750, status: 'تم التعاقد' },
+      vehicles: [{ id: VH.uid('veh'), carType: 'هيونداي H1', plate: 'ر ط ن 4471', driverName: 'عبدالله المطيري' }],
+      driver: { nationality: 'سعودي', name: 'عبدالله المطيري', phone: '0509988776', idNo: '1045887711', dailyWage: 250 },
       expenses: [
         { id: VH.uid('exp'), kind: 'بنزين', note: 'تعبئة مرتين', amount: 420, date: VH.addDays(t, -10), by: 'محمد' },
         { id: VH.uid('exp'), kind: 'مناديل', note: '', amount: 45, date: VH.addDays(t, -10), by: 'محمد' },
         { id: VH.uid('exp'), kind: 'موية', note: 'كرتونين', amount: 60, date: VH.addDays(t, -10), by: 'محمد' },
-        { id: VH.uid('exp'), kind: 'يومية السواق', note: 'يومية السواق 5 أيام', amount: 1250, date: VH.addDays(t, -8), by: 'محمد' }
+        { id: VH.uid('exp'), kind: 'يومية السواق', note: 'يومية السواق 5 أيام × 250', amount: 1250, date: VH.addDays(t, -8), by: 'محمد' }
       ],
       timeline: [{ stage: 'done', at: VH.stamp(), by: 'النظام', note: 'صفقة تجريبية مكتملة' }]
     };
     var d2 = {
-      code: 'C-1002', clientName: 'مؤسسة درب الشرق للسياحة', clientPhone: '0533445566',
-      negotiationDate: VH.addDays(t, -6), negotiationStatus: 'تم التفاوض', owner: e2, assignee: e3,
+      code: 'C-1002', orgName: 'مؤسسة درب الشرق للسياحة', clientName: 'نورة العتيبي',
+      clientPhone: '0533445566', clientEmail: 'info@darb.example',
+      contactDate: VH.addDays(t, -6), negotiationDate: VH.addDays(t, -6),
+      negotiationStatus: 'تم الاتفاق', owner: e2, assignee: e3,
       stage: 'expenses',
-      contract: { carType: 'جي إم سي', region: 'الرياض', plate: 'ب ح د 9032', startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2), days: 5, price: 9200, priceVatIncluded: 'yes' },
-      rental: { officeName: 'مكتب الأفق لتأجير السيارات', rentPerDay: 700, rentTotal: 3500, status: 'تم التعاقد' },
-      driver: { name: 'سعد الحربي', phone: '0544556677', dailyWage: 300 },
+      quote: {
+        orgName: 'مؤسسة درب الشرق للسياحة', carType: 'جي إم سي', carsCount: 2, city: 'الرياض',
+        withDriver: 'بسائق', startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2), days: 5,
+        pricePerCarPerDay: 920, total: 9200, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'محمد'
+      },
+      contract: {
+        carType: 'جي إم سي', carsCount: 2, region: 'الرياض', withDriver: 'بسائق',
+        startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2), days: 5,
+        pricePerCarPerDay: 920, price: 9200, priceVatIncluded: 'yes', fromQuote: true
+      },
+      rental: { officeName: 'مكتب الأفق لتأجير السيارات', plate: 'ب ح د 9032، ج ك ل 5512', rentPerDay: 350, rentTotal: 3500, status: 'تم التعاقد' },
+      vehicles: [
+        { id: VH.uid('veh'), carType: 'جي إم سي', plate: 'ب ح د 9032', driverName: 'سعد الحربي' },
+        { id: VH.uid('veh'), carType: 'جي إم سي', plate: 'ج ك ل 5512', driverName: 'ماجد الشهري' }
+      ],
+      driver: { nationality: 'سعودي', name: 'سعد الحربي', phone: '0544556677', idNo: '1099887766', dailyWage: 200 },
       expenses: [{ id: VH.uid('exp'), kind: 'بنزين', note: '', amount: 380, date: VH.addDays(t, -1), by: 'معاوية' }],
       timeline: [{ stage: 'expenses', at: VH.stamp(), by: 'النظام', note: 'صفقة تجريبية قيد التنفيذ' }]
     };
     var d3 = {
-      code: 'C-1003', clientName: 'مجموعة النخبة للفعاليات', clientPhone: '0500112233',
-      negotiationDate: VH.addDays(t, -1), negotiationStatus: 'قيد التنفيذ', owner: e3, assignee: '',
-      stage: 'negotiation', contract: {}, rental: {}, driver: {}, expenses: [],
-      timeline: [{ stage: 'negotiation', at: VH.stamp(), by: 'النظام', note: 'صفقة تجريبية في التفاوض' }]
+      code: 'C-1003', orgName: 'مجموعة النخبة للفعاليات', clientName: 'فيصل الدوسري',
+      clientPhone: '0500112233', clientEmail: 'events@nokhba.example',
+      contactDate: VH.addDays(t, -1), negotiationDate: VH.addDays(t, -1),
+      negotiationStatus: 'جاري العمل والمتابعة', owner: e3, assignee: '',
+      stage: 'marketing', quote: {}, contract: {}, rental: {}, vehicles: [], driver: {}, expenses: [],
+      timeline: [{ stage: 'marketing', at: VH.stamp(), by: 'النظام', note: 'عميل تجريبي في مرحلة التسويق' }]
     };
 
     [d1, d2, d3].forEach(function (d) { VH.store.save('deals', d); });
 
+    // قائمة السائقين تُبنى تلقائياً
+    [{ nationality: 'سعودي', name: 'عبدالله المطيري', phone: '0509988776', idNo: '1045887711', dailyWage: 250 },
+     { nationality: 'سعودي', name: 'سعد الحربي', phone: '0544556677', idNo: '1099887766', dailyWage: 200 },
+     { nationality: 'غير سعودي', name: 'ماجد الشهري', phone: '0566554433', idNo: '2233445566', dailyWage: 150 }
+    ].forEach(function (x) { VH.store.upsertDriver(x); });
+
     var t1 = VH.ops.calc(d1);
     VH.finance.createInvoice({
-      direction: 'in', party: d1.clientName, partyPhone: d1.clientPhone, partyType: 'عميل', dealId: d1.id, dealCode: d1.code,
+      direction: 'in', party: d1.orgName, partyPhone: d1.clientPhone, partyType: 'عميل', dealId: d1.id, dealCode: d1.code,
       description: 'خدمة نقل — هيونداي H1 / مكة المكرمة (5 أيام)', amountBeforeVat: t1.revenueBefore, vatRate: 15,
       vatAmount: t1.vat, total: t1.revenueTotal, category: 'إيراد خدمة', status: 'paid', paidDate: VH.addDays(t, -5), method: 'تحويل بنكي', date: VH.addDays(t, -8)
     });
@@ -504,8 +588,8 @@ window.VH = window.VH || {};
     });
     var t2 = VH.ops.calc(d2);
     VH.finance.createInvoice({
-      direction: 'in', party: d2.clientName, partyPhone: d2.clientPhone, partyType: 'عميل', dealId: d2.id, dealCode: d2.code,
-      description: 'خدمة نقل — جي إم سي / الرياض (5 أيام)', amountBeforeVat: t2.revenueBefore, vatRate: 15,
+      direction: 'in', party: d2.orgName, partyPhone: d2.clientPhone, partyType: 'عميل', dealId: d2.id, dealCode: d2.code,
+      description: 'خدمة نقل — جي إم سي ×2 / الرياض (5 أيام)', amountBeforeVat: t2.revenueBefore, vatRate: 15,
       vatAmount: t2.vat, total: t2.revenueTotal, category: 'إيراد خدمة', status: 'unpaid', date: t
     });
     if (!VH.num(VH.store.settings().openingBalance)) VH.store.saveSettings({ openingBalance: 25000 });

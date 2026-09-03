@@ -261,13 +261,24 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
 .b-green{ background:var(--ok-bg); color:var(--ok) }
 .b-red{ background:var(--bad-bg); color:var(--bad) }
 .b-purple{ background:#EDE9F7; color:#5B4B9E }
+.b-pink{ background:#FDE4EF; color:#C2417C }
+.b-peach{ background:#FFEAD6; color:#B96A18 }
+.b-sky{ background:#E3F1FC; color:#2A7CB0 }
+.b-mint{ background:#DFF4EC; color:#1E8C67 }
+.b-lime{ background:#EDF7DC; color:#5A8A2A }
 
 /* ===================== لوحة العمليات (كانبان) ===================== */
-.board{ display:grid; grid-template-columns:repeat(6,minmax(230px,1fr)); gap:12px; overflow-x:auto; padding-bottom:10px }
-.col{ background:#EDEAE1; border-radius:var(--vh-r); padding:10px; min-height:180px }
+.board{ display:grid; grid-template-columns:repeat(8,minmax(215px,1fr)); gap:12px; overflow-x:auto; padding-bottom:10px }
+.col{
+  background:var(--col-bg,#EDEAE1); border-radius:var(--vh-r); padding:10px; min-height:180px;
+  border-top:4px solid var(--col-dot,#ccc);
+}
 .col__h{ display:flex; align-items:center; gap:8px; margin-bottom:10px; padding:0 4px }
-.col__h b{ font-size:.85rem; color:var(--vh-navy) }
-.col__h .c{ margin-inline-start:auto; background:#fff; border-radius:999px; padding:0 8px; font-size:.72rem; font-family:var(--vh-font-en) }
+.col__h b{ font-size:.82rem; color:var(--vh-navy); line-height:1.35 }
+.col__h .c{
+  margin-inline-start:auto; background:var(--col-dot,#fff); color:#fff; border-radius:999px;
+  padding:1px 9px; font-size:.72rem; font-family:var(--vh-font-en); font-weight:700; flex:0 0 auto;
+}
 .dot{ width:9px; height:9px; border-radius:50%; flex:0 0 auto }
 .deal-card{
   background:#fff; border:1px solid var(--vh-border); border-radius:11px; padding:12px; margin-bottom:8px;
@@ -356,6 +367,6 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
   .side-backdrop.is-on{ opacity:1; pointer-events:auto }
   .only-mobile{ display:inline-flex }
   .topbar{ padding:14px 16px 12px } .view{ padding:0 16px 50px }
-  .board{ grid-template-columns:repeat(6,minmax(220px,1fr)) }
+  .board{ grid-template-columns:repeat(8,minmax(215px,1fr)) }
   .login__people{ grid-template-columns:repeat(2,1fr) }
 }

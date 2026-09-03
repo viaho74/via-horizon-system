@@ -9,7 +9,7 @@ window.VH = window.VH || {};
   'use strict';
 
   var LS_KEY = 'vh_sys_v1';
-  var COLS = ['deals', 'invoices', 'audit'];
+  var COLS = ['deals', 'invoices', 'audit', 'drivers'];
   var CFG = window.VH_CONFIG || {};
 
   var DEFAULT_SETTINGS = {
@@ -34,7 +34,7 @@ window.VH = window.VH || {};
   var S = {
     mode: 'local',
     online: false,
-    data: { deals: {}, invoices: {}, audit: {}, settings: null },
+    data: { deals: {}, invoices: {}, audit: {}, drivers: {}, settings: null },
     _subs: [],
     _fb: null,        // { app, auth, db }
     _unsub: []
@@ -46,7 +46,10 @@ window.VH = window.VH || {};
     try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); } catch (e) { return {}; }
   }
   function localWrite() {
-    var out = { deals: S.data.deals, invoices: S.data.invoices, audit: S.data.audit, settings: S.data.settings };
+    var out = {
+      deals: S.data.deals, invoices: S.data.invoices, audit: S.data.audit,
+      drivers: S.data.drivers, settings: S.data.settings
+    };
     try { localStorage.setItem(LS_KEY, JSON.stringify(out)); }
     catch (e) { console.error('تعذّر الحفظ محلياً', e); }
   }
@@ -69,6 +72,7 @@ window.VH = window.VH || {};
     S.data.deals = raw.deals || {};
     S.data.invoices = raw.invoices || {};
     S.data.audit = raw.audit || {};
+    S.data.drivers = raw.drivers || {};
     S.data.settings = Object.assign({}, DEFAULT_SETTINGS, raw.settings || {});
     S.data.settings.company = Object.assign({}, DEFAULT_SETTINGS.company, (raw.settings || {}).company || {});
 
@@ -142,6 +146,24 @@ window.VH = window.VH || {};
     return e ? e.name : (id || '—');
   };
 
+  /* سجل السائقين — يُبنى تلقائياً من كل إدخال جديد ويصير قائمة منسدلة */
+  S.upsertDriver = function (dr) {
+    if (!dr || !dr.name) return null;
+    var key = String(dr.phone || '').replace(/\D/g, '');
+    var found = S.list('drivers').filter(function (x) {
+      return (key && String(x.phone || '').replace(/\D/g, '') === key) || (!key && x.name === dr.name);
+    })[0];
+    var obj = Object.assign({}, found || {}, {
+      name: dr.name, phone: dr.phone || (found || {}).phone || '', idNo: dr.idNo || (found || {}).idNo || '',
+      nationality: dr.nationality || (found || {}).nationality || '', dailyWage: dr.dailyWage || (found || {}).dailyWage || ''
+    });
+    if (found) obj.id = found.id;
+    return S.save('drivers', obj);
+  };
+  S.driverList = function () {
+    return S.list('drivers').sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ar'); });
+  };
+
   /* ---------------- الكتابة ---------------- */
   S.save = function (col, obj) {
     var isNew = !obj.id;
@@ -198,9 +220,32 @@ window.VH = window.VH || {};
   /* ---------------- النسخ الاحتياطي ---------------- */
   S.exportAll = function () {
     return JSON.stringify({
-      _system: 'via-horizon-system', _version: 1, _at: VH.stamp(),
-      deals: S.data.deals, invoices: S.data.invoices, audit: S.data.audit, settings: S.data.settings
+      _system: 'via-horizon-system', _version: 2, _at: VH.stamp(),
+      deals: S.data.deals, invoices: S.data.invoices, audit: S.data.audit,
+      drivers: S.data.drivers, settings: S.data.settings
     }, null, 2);
+  };
+
+  /* ---------------- ترحيل البيانات من النسخة الأولى ---------------- */
+  var OLD_STATUS = {
+    'بداية التفاوض': 'بداية التواصل',
+    'قيد التنفيذ': 'جاري العمل والمتابعة',
+    'تم التفاوض': 'تم الاتفاق'
+  };
+  S.migrate = function () {
+    var changed = 0;
+    S.list('deals').forEach(function (d) {
+      var dirty = false;
+      if (d.stage === 'negotiation') { d.stage = 'marketing'; dirty = true; }
+      if (d.negotiationStatus && OLD_STATUS[d.negotiationStatus]) { d.negotiationStatus = OLD_STATUS[d.negotiationStatus]; dirty = true; }
+      if (!d.contactDate) { d.contactDate = d.negotiationDate || VH.today(); dirty = true; }
+      if (!d.orgName) { d.orgName = d.clientName || ''; dirty = true; }
+      if (!d.vehicles) { d.vehicles = []; dirty = true; }
+      if (!d.quote) { d.quote = {}; dirty = true; }
+      if (dirty) { changed++; S.data.deals[d.id] = d; }
+    });
+    if (changed && S.mode === 'local') localWrite();
+    return changed;
   };
   S.importAll = function (json, replace) {
     var d = typeof json === 'string' ? JSON.parse(json) : json;

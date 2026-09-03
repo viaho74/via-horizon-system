@@ -63,6 +63,11 @@ window.VH = window.VH || {};
 
     var err = document.getElementById('loginErr');
     var form = document.getElementById('loginForm');
+    // ضمان عمل زر Enter من حقل الرقم السري في كل المتصفحات
+    var pinEl = document.getElementById('loginPin');
+    pinEl.onkeydown = function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); form.onsubmit(e); }
+    };
     form.onsubmit = function (e) {
       e.preventDefault();
       err.textContent = '';

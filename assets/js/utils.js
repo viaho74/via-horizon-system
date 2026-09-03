@@ -39,6 +39,9 @@ window.VH = window.VH || {};
     return d > 0 ? d : 0;
   };
   U.MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  U.DAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+  /** اسم اليوم بالعربي من تاريخ YYYY-MM-DD */
+  U.dayName = function (s) { var d = U.toDate(s); return d ? U.DAYS[d.getDay()] : '—'; };
   U.dateAr = function (s) {
     var d = U.toDate(s); if (!d) return '—';
     return d.getDate() + ' ' + U.MONTHS[d.getMonth()] + ' ' + d.getFullYear();
@@ -169,6 +172,38 @@ window.VH = window.VH || {};
     var bin = '';
     for (var i = 0; i < out.length; i++) bin += String.fromCharCode(out[i]);
     return btoa(bin);
+  };
+
+  /* ---------- الصور: ضغط وتصغير قبل الحفظ ---------- */
+  /**
+   * يقرأ صورة من حقل ملف ويصغّرها ويضغطها لتُحفظ داخل بيانات الصفقة.
+   * الحد الأقصى لمستند Firestore ‏1 ميجابايت، لذا نصغّر إلى 1400px وجودة 0.72.
+   */
+  U.readImage = function (file, maxDim, quality) {
+    maxDim = maxDim || 1400; quality = quality || 0.72;
+    return new Promise(function (res, rej) {
+      if (!file) return rej(new Error('لم يُختر ملف'));
+      if (!/^image\//.test(file.type)) return rej(new Error('الملف ليس صورة (اختاري JPG أو PNG)'));
+      if (file.size > 12 * 1024 * 1024) return rej(new Error('حجم الصورة أكبر من 12 ميجابايت'));
+      var fr = new FileReader();
+      fr.onerror = function () { rej(new Error('تعذّرت قراءة الصورة')); };
+      fr.onload = function () {
+        var img = new Image();
+        img.onerror = function () { rej(new Error('الصورة غير صالحة')); };
+        img.onload = function () {
+          var w = img.width, h = img.height, sc = Math.min(1, maxDim / Math.max(w, h));
+          var cv = document.createElement('canvas');
+          cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          var out = cv.toDataURL('image/jpeg', quality);
+          if (out.length > 900000) out = cv.toDataURL('image/jpeg', 0.5);
+          if (out.length > 900000) return rej(new Error('الصورة كبيرة جداً — صوّريها بجودة أقل'));
+          res({ dataUrl: out, kb: Math.round(out.length / 1365), w: cv.width, h: cv.height });
+        };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    });
   };
 
   U.debounce = function (fn, ms) {

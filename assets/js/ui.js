@@ -84,6 +84,16 @@ window.VH = window.VH || {};
         input = '<textarea' + attrs + ' rows="' + (f.rows || 3) + '">' + VH.esc(f.value || '') + '</textarea>';
       } else if (f.type === 'static') {
         input = '<input' + attrs + ' type="text" value="' + VH.esc(f.value || '') + '" readonly>';
+      } else if (f.type === 'datalist') {
+        // حقل كتابة حرّة مع اقتراحات من قائمة محفوظة
+        var lid = 'dl_' + f.name;
+        input = '<input' + attrs + ' type="text" list="' + lid + '" value="' + VH.esc(f.value || '') + '" autocomplete="off">' +
+          '<datalist id="' + lid + '">' + (f.options || []).map(function (o) {
+            var v = (o.v !== undefined ? o.v : o);
+            return '<option value="' + VH.esc(v) + '"' + (o.t && o.t !== v ? ' label="' + VH.esc(o.t) + '"' : '') + '></option>';
+          }).join('') + '</datalist>';
+      } else if (f.type === 'file') {
+        input = '<input' + attrs + ' type="file" accept="' + (f.accept || 'image/*') + '">';
       } else {
         var extra = '';
         if (f.type === 'number') extra = ' step="' + (f.step || '0.01') + '" min="' + (f.min !== undefined ? f.min : '0') + '" dir="ltr"';
@@ -99,6 +109,7 @@ window.VH = window.VH || {};
   F.read = function (scope) {
     var out = {};
     scope.querySelectorAll('[data-f]').forEach(function (el) {
+      if (el.type === 'file') return;   // الملفات تُعالج يدوياً
       var v = el.value;
       if (el.type === 'number') v = v === '' ? '' : VH.num(v);
       out[el.getAttribute('data-f')] = typeof v === 'string' ? v.trim() : v;
@@ -129,14 +140,17 @@ window.VH = window.VH || {};
   VH.form = F;
 
   /* ---------------- الشارات ---------------- */
+  /* المراحل بألوان ربيعية — bg خلفية العمود، dot لون الشريط والنقطة */
   VH.STAGES = [
-    { k: 'negotiation', t: 'مرحلة التفاوض', c: 'b-gray', dot: '#9AA5AF' },
-    { k: 'office', t: 'التفاوض مع مكتب الإيجار', c: 'b-purple', dot: '#5B4B9E' },
-    { k: 'assigned', t: 'تحويل المهمة للموظف', c: 'b-blue', dot: '#0C3A61' },
-    { k: 'driver', t: 'التعاقد مع السواق', c: 'b-teal', dot: '#00A6B4' },
-    { k: 'expenses', t: 'فواتير الصرف', c: 'b-gold', dot: '#D6AD55' },
-    { k: 'done', t: 'مكتملة', c: 'b-green', dot: '#1F9D6B' },
-    { k: 'cancelled', t: 'ملغية', c: 'b-red', dot: '#C0392B' }
+    { k: 'marketing', t: 'تسويق المبيعات', c: 'b-pink', bg: '#FDECF3', dot: '#E86FA6' },
+    { k: 'quote', t: 'عرض السعر', c: 'b-peach', bg: '#FFF1E4', dot: '#F0913F' },
+    { k: 'office', t: 'التفاوض مع مكتب الإيجار', c: 'b-purple', bg: '#F2EDFB', dot: '#8B6FC0' },
+    { k: 'assigned', t: 'تحويل المهمة للموظف', c: 'b-sky', bg: '#E9F4FD', dot: '#3E9BD8' },
+    { k: 'vehicles', t: 'تعبئة بيانات السيارات', c: 'b-mint', bg: '#E7F7F1', dot: '#2FB786' },
+    { k: 'driver', t: 'التعاقد مع السواق', c: 'b-lime', bg: '#F1F9E1', dot: '#7CB342' },
+    { k: 'expenses', t: 'فواتير الصرف', c: 'b-gold', bg: '#FFF7E1', dot: '#D6AD55' },
+    { k: 'done', t: 'مكتملة', c: 'b-green', bg: '#E8F7EF', dot: '#1F9D6B' },
+    { k: 'cancelled', t: 'ملغية', c: 'b-red', bg: '#FDEDEB', dot: '#C0392B' }
   ];
   VH.stage = function (k) {
     return VH.STAGES.filter(function (s) { return s.k === k; })[0] || VH.STAGES[0];
@@ -145,11 +159,17 @@ window.VH = window.VH || {};
     var s = VH.stage(k);
     return '<span class="badge ' + s.c + '">' + s.t + '</span>';
   };
-  VH.NEG_STATUS = ['بداية التفاوض', 'قيد التنفيذ', 'تم التفاوض', 'ملغي'];
-  VH.negBadge = function (st) {
-    var c = st === 'تم التفاوض' ? 'b-green' : st === 'ملغي' ? 'b-red' : st === 'قيد التنفيذ' ? 'b-gold' : 'b-gray';
-    return '<span class="badge ' + c + '">' + VH.esc(st || 'بداية التفاوض') + '</span>';
+
+  /* حالات الصفقة في مرحلتَي التسويق وعرض السعر */
+  VH.DEAL_STATUS = ['بداية التواصل', 'جاري العمل والمتابعة', 'تم إرسال طلب السعر', 'تم الاتفاق', 'ملغي'];
+  VH.statusBadge = function (st) {
+    var map = {
+      'بداية التواصل': 'b-gray', 'جاري العمل والمتابعة': 'b-sky',
+      'تم إرسال طلب السعر': 'b-peach', 'تم الاتفاق': 'b-green', 'ملغي': 'b-red'
+    };
+    return '<span class="badge ' + (map[st] || 'b-gray') + '">' + VH.esc(st || 'بداية التواصل') + '</span>';
   };
+  VH.negBadge = VH.statusBadge; // توافق مع الاسم القديم
   VH.payBadge = function (st) {
     return st === 'paid'
       ? '<span class="badge b-green">مدفوعة</span>'
@@ -168,9 +188,12 @@ window.VH = window.VH || {};
   VH.empty = function (icon, msg, btn) {
     return '<div class="empty"><div class="big">' + icon + '</div><p>' + msg + '</p>' + (btn || '') + '</div>';
   };
+  /** o.count = true للأعداد (بلا كسور ولا «ر.س») · o.unit لوحدة مخصّصة */
   VH.statCard = function (o) {
+    var unit = o.count ? (o.unit || '') : (o.unit === undefined ? 'ر.س' : o.unit);
     return '<div class="stat ' + (o.cls || '') + '"><h3>' + o.title + '</h3>' +
-      '<div class="v">' + VH.fmt(o.value) + '</div> <span class="small muted">ر.س</span>' +
+      '<div class="v">' + (o.count ? VH.int(o.value) : VH.fmt(o.value)) + '</div>' +
+      (unit ? ' <span class="small muted">' + unit + '</span>' : '') +
       (o.delta ? ' <span class="chip-delta ' + o.delta.dir + '">' +
         (o.delta.dir === 'up' ? '▲ ' : o.delta.dir === 'down' ? '▼ ' : '– ') + VH.fmt(o.delta.pct) + '%</span>' : '') +
       '<div class="d">' + (o.desc || '') + '</div></div>';
