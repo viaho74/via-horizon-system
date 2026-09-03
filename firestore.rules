@@ -1,0 +1,45 @@
+rules_version = '2';
+
+// =====================================================================
+// قواعد أمان Firestore — نظام فيا هورايزن
+// انسخي هذا الملف كاملاً في: console.firebase.google.com
+//   ← Firestore Database ← Rules ← الصق ← Publish
+//
+// القاعدة باختصار: لا أحد يقرأ أو يكتب أي شيء إلا بعد تسجيل الدخول
+// بحساب موظف أنشأتِه أنت في Firebase Authentication.
+// =====================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // الصفقات والعقود
+    match /deals/{dealId} {
+      allow read, write: if signedIn();
+    }
+
+    // الفواتير
+    match /invoices/{invoiceId} {
+      allow read, write: if signedIn();
+    }
+
+    // سجل الأحداث — يُكتب ولا يُعدّل ولا يُحذف
+    match /audit/{logId} {
+      allow read, create: if signedIn();
+      allow update, delete: if false;
+    }
+
+    // الإعدادات
+    match /settings/{docId} {
+      allow read, write: if signedIn();
+    }
+
+    // أي مسار آخر مرفوض
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

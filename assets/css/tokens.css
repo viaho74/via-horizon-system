@@ -1,0 +1,229 @@
+/* =====================================================================
+   VIA HORIZON — Design Tokens
+   شركة فيا هورايزن | متغيّرات الهوية الرسمية
+   ---------------------------------------------------------------------
+   الاستخدام:
+   - ووردبريس: المظهر ← تخصيص ← CSS إضافي (الصق الملف كاملاً)
+     أو ضمن ملف style.css في القالب الابن (child theme).
+   - HTML عادي: <link rel="stylesheet" href="via-horizon-tokens.css">
+   المصدر: الدليل الإرشادي لهوية فيا هورايزن VIA HORIZON
+   ===================================================================== */
+
+:root {
+  /* ---------- الألوان الأساسية (لا تُعدّل) ---------- */
+  --vh-navy:      #082B49;  /* الثقة والاستقرار والسفر */
+  --vh-teal:      #00A6B4;  /* الانطلاق والحيوية */
+  --vh-gold:      #D6AD55;  /* القيمة والتميّز */
+  --vh-cream:     #F7F5EF;  /* الخلفية الأساسية */
+
+  /* ---------- تدرّجات مشتقّة (للاستخدام في الحالات فقط) ---------- */
+  --vh-navy-900:  #051D33;
+  --vh-navy-700:  #0C3A61;
+  --vh-navy-500:  #114E80;
+  --vh-teal-700:  #00808B;
+  --vh-teal-300:  #5FCBD4;
+  --vh-gold-700:  #B08C3C;
+  --vh-gold-300:  #E8CE93;
+  --vh-cream-200: #EDE9DE;
+  --vh-white:     #FFFFFF;
+
+  /* ---------- النص ---------- */
+  --vh-text:        var(--vh-navy);
+  --vh-text-muted:  rgba(8, 43, 73, .68);
+  --vh-text-soft:   rgba(8, 43, 73, .45);
+  --vh-text-invert: var(--vh-cream);
+
+  /* ---------- الأسطح ---------- */
+  --vh-bg:        var(--vh-cream);
+  --vh-surface:   #FFFFFF;
+  --vh-surface-2: var(--vh-cream-200);
+  --vh-border:    rgba(8, 43, 73, .12);
+  --vh-border-gold: rgba(214, 173, 85, .45);
+
+  /* ---------- التدرّجات ---------- */
+  --vh-grad-brand: linear-gradient(135deg, var(--vh-navy) 0%, var(--vh-teal) 100%);
+  --vh-grad-gold:  linear-gradient(135deg, var(--vh-gold-700) 0%, var(--vh-gold-300) 100%);
+  --vh-grad-dark:  linear-gradient(180deg, var(--vh-navy) 0%, var(--vh-navy-900) 100%);
+
+  /* ---------- الخطوط ---------- */
+  --vh-font-ar: "TheSansArab", "IBM Plex Sans Arabic", "Tajawal", system-ui, sans-serif;
+  --vh-font-en: "Ping AR + LT", "Poppins", "Inter", system-ui, sans-serif;
+
+  --vh-fs-h1: clamp(2.125rem, 1.4rem + 3.2vw, 3.5rem);   /* 34 → 56 */
+  --vh-fs-h2: clamp(1.75rem,  1.25rem + 2.2vw, 2.5rem);  /* 28 → 40 */
+  --vh-fs-h3: clamp(1.375rem, 1.15rem + 1vw,  1.75rem);  /* 22 → 28 */
+  --vh-fs-body: 1.0625rem;   /* 17 */
+  --vh-fs-sm:   0.875rem;    /* 14 */
+  --vh-lh-ar:   1.85;        /* العربية تحتاج تنفّساً أكبر */
+  --vh-lh-head: 1.3;
+  --vh-ls-caps: .18em;       /* مثل كلمة HORIZON بالشعار */
+
+  /* ---------- المسافات (سلّم 4px) ---------- */
+  --vh-s1: .25rem;  --vh-s2: .5rem;   --vh-s3: .75rem;
+  --vh-s4: 1rem;    --vh-s5: 1.5rem;  --vh-s6: 2rem;
+  --vh-s7: 3rem;    --vh-s8: 4rem;    --vh-s9: 6rem;
+
+  /* ---------- الحواف والظلال ---------- */
+  --vh-r-sm:   8px;
+  --vh-r:      14px;   /* البطاقات */
+  --vh-r-lg:   24px;
+  --vh-r-pill: 999px;  /* الأزرار الحبوبية */
+
+  --vh-shadow-sm: 0 2px 8px rgba(8, 43, 73, .06);
+  --vh-shadow:    0 10px 30px rgba(8, 43, 73, .10);
+  --vh-shadow-lg: 0 24px 60px rgba(8, 43, 73, .16);
+
+  /* ---------- الحركة ---------- */
+  --vh-ease: cubic-bezier(.22, .61, .36, 1);
+  --vh-dur:  .28s;
+
+  /* ---------- التخطيط ---------- */
+  --vh-container: 1200px;
+  --vh-gutter: clamp(1rem, 4vw, 2.5rem);
+
+  /* ---------- ألوان المسارات الثلاثة ---------- */
+  --vh-track-transport: var(--vh-gold);  /* النقل   */
+  --vh-track-travel:    var(--vh-navy);  /* السفر   */
+  --vh-track-tourism:   var(--vh-teal);  /* السياحة */
+}
+
+/* =====================================================================
+   الوضع الداكن — اختياري. يُفعّل تلقائياً حسب تفضيل الجهاز.
+   الهوية تبقى نفسها: الكحلي يصبح خلفية والكريمي يصبح نصاً.
+   ===================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root[data-vh-theme="auto"] {
+    --vh-bg:        var(--vh-navy-900);
+    --vh-surface:   var(--vh-navy);
+    --vh-surface-2: var(--vh-navy-700);
+    --vh-text:        var(--vh-cream);
+    --vh-text-muted:  rgba(247, 245, 239, .70);
+    --vh-text-soft:   rgba(247, 245, 239, .45);
+    --vh-text-invert: var(--vh-navy);
+    --vh-border:    rgba(247, 245, 239, .14);
+  }
+}
+:root[data-vh-theme="dark"] {
+  --vh-bg: var(--vh-navy-900);
+  --vh-surface: var(--vh-navy);
+  --vh-surface-2: var(--vh-navy-700);
+  --vh-text: var(--vh-cream);
+  --vh-text-muted: rgba(247, 245, 239, .70);
+  --vh-text-soft: rgba(247, 245, 239, .45);
+  --vh-text-invert: var(--vh-navy);
+  --vh-border: rgba(247, 245, 239, .14);
+}
+
+/* =====================================================================
+   الأساسيات — RTL أولاً
+   ===================================================================== */
+html[dir="rtl"] body,
+body {
+  background: var(--vh-bg);
+  color: var(--vh-text);
+  font-family: var(--vh-font-ar);
+  font-size: var(--vh-fs-body);
+  line-height: var(--vh-lh-ar);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 { line-height: var(--vh-lh-head); font-weight: 700; color: var(--vh-text); }
+h1 { font-size: var(--vh-fs-h1); }
+h2 { font-size: var(--vh-fs-h2); }
+h3 { font-size: var(--vh-fs-h3); }
+
+a { color: var(--vh-teal-700); text-decoration: none; transition: color var(--vh-dur) var(--vh-ease); }
+a:hover { color: var(--vh-gold-700); }
+
+/* الأرقام والنصوص اللاتينية داخل نص عربي */
+.vh-en, .vh-num { font-family: var(--vh-font-en); direction: ltr; unicode-bidi: isolate; }
+
+/* =====================================================================
+   المكوّنات الأساسية
+   ===================================================================== */
+
+/* --- الحاوية --- */
+.vh-container { max-width: var(--vh-container); margin-inline: auto; padding-inline: var(--vh-gutter); }
+.vh-section { padding-block: clamp(3rem, 8vw, 6rem); }
+
+/* --- الأزرار --- */
+.vh-btn {
+  display: inline-flex; align-items: center; gap: var(--vh-s2);
+  padding: .8rem 1.9rem;
+  border-radius: var(--vh-r-pill);
+  border: 1.5px solid transparent;
+  font: inherit; font-weight: 700; cursor: pointer;
+  transition: transform var(--vh-dur) var(--vh-ease),
+              box-shadow var(--vh-dur) var(--vh-ease),
+              background var(--vh-dur) var(--vh-ease),
+              color var(--vh-dur) var(--vh-ease);
+}
+.vh-btn:hover { transform: translateY(-2px); box-shadow: var(--vh-shadow); }
+.vh-btn:focus-visible { outline: 3px solid var(--vh-teal); outline-offset: 3px; }
+
+.vh-btn--primary   { background: var(--vh-gold); color: var(--vh-navy); }
+.vh-btn--primary:hover { background: var(--vh-gold-300); color: var(--vh-navy); }
+
+.vh-btn--dark      { background: var(--vh-navy); color: var(--vh-cream); }
+.vh-btn--dark:hover{ background: var(--vh-navy-700); color: var(--vh-cream); }
+
+.vh-btn--ghost     { background: transparent; color: var(--vh-navy); border-color: var(--vh-border-gold); }
+.vh-btn--ghost:hover { background: var(--vh-navy); color: var(--vh-cream); border-color: var(--vh-navy); }
+
+.vh-btn--on-dark   { background: transparent; color: var(--vh-cream); border-color: rgba(247,245,239,.4); }
+.vh-btn--on-dark:hover { background: var(--vh-cream); color: var(--vh-navy); }
+
+/* --- البطاقة --- */
+.vh-card {
+  background: var(--vh-surface);
+  border: 1px solid var(--vh-border);
+  border-radius: var(--vh-r);
+  padding: var(--vh-s6);
+  box-shadow: var(--vh-shadow-sm);
+  transition: transform var(--vh-dur) var(--vh-ease), box-shadow var(--vh-dur) var(--vh-ease);
+}
+.vh-card:hover { transform: translateY(-4px); box-shadow: var(--vh-shadow); }
+
+/* --- القوس الذهبي: عنصر الهوية المميّز --- */
+.vh-arc { position: relative; padding-bottom: var(--vh-s4); }
+.vh-arc::after {
+  content: ""; position: absolute; inset-inline-start: 0; bottom: 0;
+  width: 120px; height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at 50% 100%, transparent 58%, var(--vh-gold) 60%);
+}
+.vh-arc--center::after { inset-inline-start: 50%; transform: translateX(50%); }
+
+/* --- شارة المسار --- */
+.vh-badge {
+  display: inline-flex; align-items: center; gap: var(--vh-s2);
+  padding: .35rem 1rem; border-radius: var(--vh-r-pill);
+  font-size: var(--vh-fs-sm); font-weight: 700;
+  background: var(--vh-surface-2); color: var(--vh-navy);
+}
+.vh-badge--transport { background: var(--vh-gold); color: var(--vh-navy); }
+.vh-badge--travel    { background: var(--vh-navy); color: var(--vh-cream); }
+.vh-badge--tourism   { background: var(--vh-teal); color: var(--vh-white); }
+
+/* --- النقش الخلفي (حرفا V و A بميلان) --- */
+.vh-pattern {
+  background-color: var(--vh-navy);
+  background-image:
+    repeating-linear-gradient(115deg, rgba(247,245,239,.055) 0 2px, transparent 2px 46px),
+    repeating-linear-gradient( 65deg, rgba(247,245,239,.055) 0 2px, transparent 2px 46px);
+}
+
+/* --- الشبكة --- */
+.vh-grid { display: grid; gap: var(--vh-s5); }
+.vh-grid--2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.vh-grid--3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.vh-grid--4 { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+
+/* --- إتاحة الوصول --- */
+.vh-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
