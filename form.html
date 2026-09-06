@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/tokens.css?v=5">
+<link rel="stylesheet" href="assets/css/tokens.css?v=6">
 <style>
 *,*::before,*::after{ box-sizing:border-box }
 html,body{ margin:0; padding:0 }
@@ -160,6 +160,22 @@ img{ max-width:100%; display:block }
           <span class="msg" data-msg="carsCount"></span>
         </div>
 
+        <div class="f">
+          <label for="withDriver">مع سائق أو بدون؟ <i>*</i></label>
+          <select id="withDriver" name="withDriver" required>
+            <option value="بسائق">مع سائق</option>
+            <option value="بدون سائق">بدون سائق</option>
+          </select>
+          <span class="msg" data-msg="withDriver"></span>
+        </div>
+
+        <div class="f" id="driversWrap" hidden>
+          <label for="driversCount">كم سيارة تحتاج سائقاً؟ <i>*</i></label>
+          <input id="driversCount" name="driversCount" type="number" class="ltr" min="1" max="200" step="1">
+          <span class="hint" id="driversHint"></span>
+          <span class="msg" data-msg="driversCount"></span>
+        </div>
+
         <div class="f f--full">
           <label for="expectedStart">بداية المشروع المتوقعة <i>*</i></label>
           <input id="expectedStart" name="expectedStart" type="date" class="ltr" required>
@@ -186,7 +202,7 @@ img{ max-width:100%; display:block }
 
 <p class="foot">© شركة فيا هورايزن · <a href="https://viahorizon.sa" target="_blank" rel="noopener">viahorizon.sa</a></p>
 
-<script src="assets/js/config.js?v=5"></script>
-<script src="assets/js/form.js?v=5"></script>
+<script src="assets/js/config.js?v=6"></script>
+<script src="assets/js/form.js?v=6"></script>
 </body>
 </html>

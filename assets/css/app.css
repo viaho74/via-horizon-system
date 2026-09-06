@@ -250,6 +250,12 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
 .tbl tbody tr:hover{ background:#FBFAF6 }
 .tbl .n{ font-family:var(--vh-font-en); direction:ltr; unicode-bidi:isolate; white-space:nowrap }
 .tbl .actions{ display:flex; gap:6px; justify-content:flex-end }
+/* حقول الإدخال داخل جداول البنود (عرض السعر) */
+.tbl input.qin,.tbl select.qin{
+  width:100%; min-width:84px; padding:7px 9px; border:1.5px solid var(--vh-border); border-radius:8px; background:#fff;
+}
+.tbl input.qin:focus,.tbl select.qin:focus{ outline:none; border-color:var(--vh-teal); box-shadow:0 0 0 3px rgba(0,166,180,.16) }
+.tbl tfoot th{ text-align:right; padding:9px 12px; border-top:1px solid var(--vh-border); font-size:.85rem }
 .empty{ padding:44px 20px; text-align:center; color:var(--vh-text-soft) }
 .empty .big{ font-size:2.2rem; margin-bottom:6px; opacity:.5 }
 

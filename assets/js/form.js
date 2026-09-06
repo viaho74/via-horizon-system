@@ -33,8 +33,27 @@
     phone: { req: true, test: function (v) { return /^(?:\+?966|0)?5\d{8}$/.test(v.replace(/[\s-]/g, '')); }, msg: 'أدخل رقم جوال سعودي صحيح (مثال: 0512345678)' },
     city: { req: true, msg: 'اختر المدينة' },
     carsCount: { req: true, test: function (v) { return +v >= 1 && +v <= 200; }, msg: 'أدخل عدد سيارات بين 1 و 200' },
+    withDriver: { req: true, msg: 'اختر مع سائق أو بدون' },
     expectedStart: { req: true, msg: 'اختر التاريخ المتوقع لبدء المشروع' }
   };
+
+  /* عند اختيار أكثر من سيارة مع سائق: نسأل كم سيارة تحتاج سائقاً */
+  var carsEl = document.getElementById('carsCount');
+  var wdEl = document.getElementById('withDriver');
+  var dWrap = document.getElementById('driversWrap');
+  var dEl = document.getElementById('driversCount');
+  function syncDrivers() {
+    var n = +carsEl.value || 0;
+    var show = n > 1 && wdEl.value === 'بسائق';
+    dWrap.hidden = !show;
+    if (show) {
+      dEl.max = n;
+      if (!dEl.value || +dEl.value > n) dEl.value = n;
+      document.getElementById('driversHint').textContent = 'من أصل ' + n + ' سيارات — الباقي يكون بدون سائق.';
+    }
+  }
+  carsEl.addEventListener('input', syncDrivers);
+  wdEl.addEventListener('change', syncDrivers);
 
   function showMsg(name, text) {
     var el = document.querySelector('[data-msg="' + name + '"]');
@@ -59,6 +78,16 @@
       if (bad && !firstBad) firstBad = el;
     });
     vals.jobTitle = (document.getElementById('jobTitle').value || '').trim();
+    // عدد السيارات التي تحتاج سائقاً (يظهر فقط مع أكثر من سيارة بسائق)
+    var n = +vals.carsCount || 0;
+    if (n > 1 && vals.withDriver === 'بسائق') {
+      var dc = +dEl.value || 0;
+      if (dc < 1 || dc > n) { showMsg('driversCount', 'أدخل عدداً بين 1 و ' + n); if (!firstBad) firstBad = dEl; }
+      else showMsg('driversCount', '');
+      vals.driversCount = dc;
+    } else {
+      vals.driversCount = vals.withDriver === 'بسائق' ? n : 0;
+    }
     if (firstBad) { firstBad.focus(); return null; }
     return vals;
   }
@@ -117,7 +146,8 @@
       ref: refNo(),
       orgName: v.orgName, contactName: v.contactName, jobTitle: v.jobTitle,
       email: v.email, phone: v.phone, city: v.city,
-      carsCount: Number(v.carsCount), expectedStart: v.expectedStart,
+      carsCount: Number(v.carsCount), withDriver: v.withDriver, driversCount: Number(v.driversCount) || 0,
+      expectedStart: v.expectedStart,
       at: new Date().toISOString(), source: 'form',
       converted: false, dealId: ''
     };

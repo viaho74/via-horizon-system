@@ -178,69 +178,174 @@ window.VH = window.VH || {};
   /* =====================================================================
      ② عرض السعر — إصداره يحوّل الحالة تلقائياً إلى «تم إرسال طلب السعر»
      ===================================================================== */
+  /**
+   * يحسب بنود عرض السعر (أنواع متعددة، كل نوع بعدده وسعره وخيار السائق)
+   * items: [{carType, carsCount, withDriver, pricePerCarPerDay}]
+   * يعيد: البنود مع dailyTotal/total لكل بند + المجاميع + الضريبة 15% + الإجمالي النهائي
+   */
+  O.calcQuote = function (items, days, rate) {
+    days = VH.num(days) || 0; rate = VH.num(rate) || 15;
+    var dailyAll = 0, subtotal = 0, cars = 0;
+    var out = (items || []).map(function (it) {
+      var n = VH.num(it.carsCount) || 0, p = VH.num(it.pricePerCarPerDay) || 0;
+      var daily = VH.round2(p * n), total = VH.round2(daily * days);
+      dailyAll += daily; subtotal += total; cars += n;
+      return Object.assign({}, it, { carsCount: n, pricePerCarPerDay: p, dailyTotal: daily, total: total, perCarTotal: VH.round2(p * days) });
+    });
+    dailyAll = VH.round2(dailyAll); subtotal = VH.round2(subtotal);
+    var vat = VH.round2(subtotal * rate / 100);
+    return {
+      items: out, days: days, carsCount: cars, dailyAll: dailyAll, subtotal: subtotal,
+      vatRate: rate, vat: vat, grandTotal: VH.round2(subtotal + vat),
+      carType: out.map(function (i) { return i.carType + (i.carsCount > 1 ? ' ×' + i.carsCount : ''); }).join('، '),
+      withDriver: out.every(function (i) { return i.withDriver === 'بسائق'; }) ? 'بسائق'
+        : out.every(function (i) { return i.withDriver === 'بدون سائق'; }) ? 'بدون سائق' : 'بعضها بسائق'
+    };
+  };
+
+  /** جدول بنود عرض السعر للعرض والطباعة */
+  O.quoteItemsTable = function (q, forPrint) {
+    var items = q.items || [];
+    if (!items.length) return '';
+    var cls = forPrint ? '' : ' class="tbl"';
+    return '<div class="' + (forPrint ? '' : 'tbl-wrap') + '"><table' + cls + ' style="width:100%;min-width:600px"><thead><tr>' +
+      '<th>نوع السيارة</th><th>العدد</th><th>السائق</th><th>قيمة السيارة/اليوم</th><th>إجمالي السيارة الواحدة</th>' +
+      '<th>اليومي للنوع</th><th>إجمالي النوع</th></tr></thead><tbody>' +
+      items.map(function (i) {
+        return '<tr><td>' + VH.esc(i.carType) + '</td><td class="num">' + i.carsCount + '</td><td>' + VH.esc(i.withDriver) + '</td>' +
+          '<td class="num">' + VH.fmt(i.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(i.perCarTotal) + '</td>' +
+          '<td class="num">' + VH.fmt(i.dailyTotal) + '</td><td class="num"><b>' + VH.fmt(i.total) + '</b></td></tr>';
+      }).join('') +
+      '</tbody><tfoot style="background:' + (forPrint ? '#F0EDE4' : 'var(--vh-surface-2)') + '">' +
+      '<tr><th colspan="5">القيمة اليومية لمجموع السيارات (' + q.carsCount + ' سيارة)</th><th class="num" colspan="2">' + VH.fmt(q.dailyAll) + ' ر.س</th></tr>' +
+      '<tr><th colspan="5">الإجمالي لمجموع السيارات × ' + q.days + ' يوم — قبل الضريبة</th><th class="num" colspan="2">' + VH.fmt(q.subtotal) + ' ر.س</th></tr>' +
+      '<tr><th colspan="5">ضريبة القيمة المضافة ' + VH.fmt(q.vatRate) + '%</th><th class="num" colspan="2">' + VH.fmt(q.vat) + ' ر.س</th></tr>' +
+      '<tr style="font-size:1.05em"><th colspan="5">الإجمالي النهائي شامل الضريبة</th><th class="num" colspan="2"><b>' + VH.fmt(q.grandTotal) + ' ر.س</b></th></tr>' +
+      '</tfoot></table></div>';
+  };
+
   O.quoteModal = function (d, after) {
     var q = d.quote || {};
+    var rate = VH.num(VH.store.settings().vatRate) || 15;
+    var items = (q.items && q.items.length) ? q.items.map(function (i) { return Object.assign({}, i); })
+      : [{ carType: q.carType || CARS[0], carsCount: q.carsCount || 1, withDriver: q.withDriver || 'بسائق', pricePerCarPerDay: q.pricePerCarPerDay || '' }];
+
     var fields = [
       { name: 'orgName', label: 'اسم الجهة', value: q.orgName || d.orgName, required: true },
-      { name: 'carType', label: 'نوع السيارات', type: 'select', required: true, options: CARS.map(function (x) { return { v: x, t: x }; }), value: q.carType },
-      { name: 'carTypeOther', label: 'نوع آخر (إن اخترتِ «أخرى»)', value: q.carTypeOther },
-      { name: 'carsCount', label: 'عدد السيارات', type: 'number', step: '1', min: '1', required: true, value: q.carsCount || 1 },
       { name: 'city', label: 'مدينة المشروع', type: 'select', required: true, options: REGIONS.map(function (x) { return { v: x, t: x }; }), value: q.city },
-      {
-        name: 'withDriver', label: 'بسائق أو بدون سائق', type: 'select', required: true,
-        options: [{ v: 'بسائق', t: 'بسائق' }, { v: 'بدون سائق', t: 'بدون سائق' }], value: q.withDriver || 'بسائق'
-      },
       { name: 'startDate', label: 'فترة المشروع — من', type: 'date', required: true, value: q.startDate },
       { name: 'endDate', label: 'فترة المشروع — إلى', type: 'date', required: true, value: q.endDate },
       { name: 'days', label: 'عدد الأيام', type: 'number', value: q.days, readonly: true, hint: 'يُحسب تلقائياً' },
-      { name: 'pricePerCarPerDay', label: 'قيمة السيارة الواحدة لليوم', type: 'number', required: true, value: q.pricePerCarPerDay },
-      { name: 'total', label: 'الإجمالي', type: 'number', value: q.total, readonly: true, hint: 'القيمة × عدد السيارات × الأيام' },
       {
-        name: 'priceVatIncluded', label: 'هل السعر شامل ضريبة القيمة المضافة؟', type: 'select',
-        options: [{ v: 'yes', t: 'نعم — شامل الضريبة' }, { v: 'no', t: 'لا — يُضاف عليه 15%' }],
-        value: q.priceVatIncluded || 'yes'
+        name: '_items', type: 'html', full: true,
+        html: '<label style="font-size:.82rem;font-weight:600;color:var(--vh-navy)">أنواع السيارات <span class="req">*</span> ' +
+          '<span class="hint" style="font-weight:400">— نوع في كل سطر، ولكل نوع عدده وسعره وخيار السائق</span></label>' +
+          '<div id="qItemsBox"></div>' +
+          '<button type="button" class="btn btn--sm btn--ghost" data-add-item style="margin-top:10px">+ إضافة نوع سيارة</button>'
+      },
+      {
+        name: '_sum', type: 'html', full: true,
+        html: '<div id="qSum" class="strip strip--info" style="margin:0;display:grid;gap:4px"></div>'
       },
       { name: 'notes', label: 'ملاحظات عرض السعر', type: 'textarea', full: true, rows: 2, value: q.notes }
     ];
+
+    function rowHtml(it, i) {
+      var opts = CARS.map(function (c) { return '<option' + (c === it.carType ? ' selected' : '') + '>' + VH.esc(c) + '</option>'; }).join('');
+      var isOther = CARS.indexOf(it.carType) < 0 && it.carType;
+      if (isOther) opts = opts.replace('<option>أخرى</option>', '<option selected>أخرى</option>');
+      return '<tr data-i="' + i + '">' +
+        '<td><select class="qin" data-k="carType">' + opts + '</select>' +
+        '<input class="qin" data-k="carTypeOther" placeholder="اكتبي النوع" value="' + VH.esc(isOther ? it.carType : (it.carTypeOther || '')) + '" style="margin-top:6px"' + (it.carType === 'أخرى' || isOther ? '' : ' hidden') + '></td>' +
+        '<td><input class="qin" type="number" min="1" step="1" dir="ltr" data-k="carsCount" value="' + VH.esc(it.carsCount || 1) + '"></td>' +
+        '<td><select class="qin" data-k="withDriver"><option' + (it.withDriver !== 'بدون سائق' ? ' selected' : '') + '>بسائق</option><option' + (it.withDriver === 'بدون سائق' ? ' selected' : '') + '>بدون سائق</option></select></td>' +
+        '<td><input class="qin" type="number" min="0" step="0.01" dir="ltr" data-k="pricePerCarPerDay" value="' + VH.esc(it.pricePerCarPerDay || '') + '"></td>' +
+        '<td class="n" data-percar>—</td><td class="n" data-daily>—</td><td class="n" data-total>—</td>' +
+        '<td><button type="button" class="btn btn--sm btn--danger" data-del-item title="حذف">×</button></td></tr>';
+    }
+    function renderItems(bd) {
+      bd.querySelector('#qItemsBox').innerHTML =
+        '<div class="tbl-wrap"><table class="tbl" style="min-width:820px"><thead><tr>' +
+        '<th>نوع السيارة</th><th style="width:80px">العدد</th><th style="width:130px">السائق</th><th style="width:130px">قيمة السيارة/اليوم</th>' +
+        '<th style="width:110px">إجمالي السيارة</th><th style="width:110px">اليومي للنوع</th><th style="width:120px">إجمالي النوع</th><th style="width:44px"></th>' +
+        '</tr></thead><tbody>' + items.map(rowHtml).join('') + '</tbody></table></div>';
+      recalc(bd);
+    }
+    function readItems(bd) {
+      return [].slice.call(bd.querySelectorAll('#qItemsBox tbody tr')).map(function (tr) {
+        var g = function (k) { var e = tr.querySelector('[data-k=' + k + ']'); return e ? e.value : ''; };
+        var type = g('carType');
+        if (type === 'أخرى' && g('carTypeOther').trim()) type = g('carTypeOther').trim();
+        return { carType: type, carTypeOther: g('carTypeOther').trim(), carsCount: VH.num(g('carsCount')), withDriver: g('withDriver'), pricePerCarPerDay: VH.num(g('pricePerCarPerDay')) };
+      });
+    }
+    function recalc(bd) {
+      var v = VH.form.read(bd);
+      var days = (v.startDate && v.endDate) ? VH.daysBetween(v.startDate, v.endDate) : 0;
+      bd.querySelector('[data-f=days]').value = days || '';
+      var c = O.calcQuote(readItems(bd), days, rate);
+      bd.querySelectorAll('#qItemsBox tbody tr').forEach(function (tr, i) {
+        var it = c.items[i] || {};
+        tr.querySelector('[data-percar]').textContent = VH.fmt(it.perCarTotal || 0);
+        tr.querySelector('[data-daily]').textContent = VH.fmt(it.dailyTotal || 0);
+        tr.querySelector('[data-total]').textContent = VH.fmt(it.total || 0);
+      });
+      bd.querySelector('#qSum').innerHTML =
+        '<div><span class="small muted">القيمة اليومية لمجموع السيارات (' + c.carsCount + ' سيارة):</span> <b class="num">' + VH.fmt(c.dailyAll) + '</b> ر.س' +
+        ' &nbsp;·&nbsp; <span class="small muted">الإجمالي قبل الضريبة (' + days + ' يوم):</span> <b class="num">' + VH.fmt(c.subtotal) + '</b> ر.س' +
+        ' &nbsp;·&nbsp; <span class="small muted">ضريبة ' + rate + '%:</span> <b class="num">' + VH.fmt(c.vat) + '</b> ر.س</div>' +
+        '<div style="font-size:1.05rem"><b>الإجمالي النهائي شامل الضريبة: <span class="num">' + VH.fmt(c.grandTotal) + '</span> ر.س</b></div>';
+    }
+
     VH.modal({
       title: 'عرض السعر — ' + VH.esc(d.code),
       wide: true,
       body: VH.form.render(fields),
       onOpen: function (bd) {
-        function sync() {
-          var v = VH.form.read(bd);
-          var days = (v.startDate && v.endDate) ? VH.daysBetween(v.startDate, v.endDate) : 0;
-          bd.querySelector('[data-f=days]').value = days || '';
-          bd.querySelector('[data-f=total]').value = VH.round2(VH.num(v.pricePerCarPerDay) * (VH.num(v.carsCount) || 1) * days) || '';
-        }
-        bd.addEventListener('input', sync); bd.addEventListener('change', sync); sync();
+        renderItems(bd);
+        bd.addEventListener('input', function () { recalc(bd); });
+        bd.addEventListener('change', function (e) {
+          var sel = e.target.closest('[data-k=carType]');
+          if (sel) { var o = sel.closest('tr').querySelector('[data-k=carTypeOther]'); o.hidden = sel.value !== 'أخرى'; }
+          recalc(bd);
+        });
+        bd.addEventListener('click', function (e) {
+          if (e.target.closest('[data-add-item]')) {
+            items = readItems(bd); items.push({ carType: CARS[0], carsCount: 1, withDriver: 'بسائق', pricePerCarPerDay: '' });
+            renderItems(bd);
+          }
+          var del = e.target.closest('[data-del-item]');
+          if (del) {
+            items = readItems(bd);
+            if (items.length <= 1) { VH.toast('لا بد من نوع سيارة واحد على الأقل', 'warn'); return; }
+            items.splice(+del.closest('tr').getAttribute('data-i'), 1);
+            renderItems(bd);
+          }
+        });
       },
       actions: [
         {
           label: q.sentAt ? 'حفظ التعديل' : 'إصدار وإرسال عرض السعر', cls: 'btn--gold', onClick: function (close, bd) {
             var v = VH.form.validate(bd, fields); if (!v) return;
             if (v.endDate < v.startDate) { VH.form.error(bd, 'تاريخ النهاية قبل تاريخ البداية'); return; }
-            if (!VH.num(v.pricePerCarPerDay)) { VH.form.error(bd, 'أدخلي قيمة السيارة لليوم'); return; }
+            var list = readItems(bd);
+            var bad = list.filter(function (i) { return !i.carType || i.carsCount < 1 || i.pricePerCarPerDay <= 0; });
+            if (bad.length) { VH.form.error(bd, 'أكملي كل سطر: نوع السيارة وعدد ≥ 1 وقيمة اليوم أكبر من صفر'); return; }
             var days = VH.daysBetween(v.startDate, v.endDate);
-            d.quote = {
-              orgName: v.orgName,
-              carType: v.carType === 'أخرى' && v.carTypeOther ? v.carTypeOther : v.carType,
-              carTypeOther: v.carTypeOther,
-              carsCount: VH.num(v.carsCount) || 1, city: v.city, withDriver: v.withDriver,
-              startDate: v.startDate, endDate: v.endDate, days: days,
-              pricePerCarPerDay: VH.num(v.pricePerCarPerDay),
-              total: VH.round2(VH.num(v.pricePerCarPerDay) * (VH.num(v.carsCount) || 1) * days),
-              priceVatIncluded: v.priceVatIncluded, notes: v.notes,
+            var c = O.calcQuote(list, days, rate);
+            d.quote = Object.assign(c, {
+              orgName: v.orgName, city: v.city, startDate: v.startDate, endDate: v.endDate,
+              total: c.grandTotal, priceVatIncluded: 'yes', notes: v.notes,
               sentAt: d.quote && d.quote.sentAt ? d.quote.sentAt : VH.stamp(),
               sentBy: (VH.auth.user() || {}).name
-            };
+            });
             var first = false;
             if (d.stage === 'marketing' || O.idx(d.stage) < 1) {
               d.stage = 'quote'; d.negotiationStatus = 'تم إرسال طلب السعر'; first = true;
             }
-            O.push(d, first ? 'أُصدر عرض السعر وأُرسل — ' + VH.moneyTxt(d.quote.total) : 'تعديل عرض السعر');
+            O.push(d, first ? 'أُصدر عرض السعر وأُرسل — ' + VH.moneyTxt(c.grandTotal) + ' شامل الضريبة' : 'تعديل عرض السعر');
             VH.store.save('deals', d);
-            VH.store.log('عرض سعر', d.code + ' — ' + d.quote.carsCount + ' سيارة × ' + d.quote.days + ' يوم = ' + VH.moneyTxt(d.quote.total), d.id);
+            VH.store.log('عرض سعر', d.code + ' — ' + c.carsCount + ' سيارة (' + c.carType + ') × ' + days + ' يوم = ' + VH.moneyTxt(c.grandTotal), d.id);
             close();
             VH.toast(first ? 'تم إرسال طلب السعر — تغيّرت الحالة تلقائياً' : 'حُفظ عرض السعر', 'ok');
             if (after) after();
@@ -259,10 +364,12 @@ window.VH = window.VH || {};
       'ستُنقل مدخلات عرض السعر تلقائياً إلى بيانات العقد، وتنتقل الصفقة إلى «التفاوض مع مكتب الإيجار».',
       'تم الاتفاق', function () {
         d.contract = Object.assign({}, d.contract || {}, {
+          items: (q.items || []).map(function (i) { return Object.assign({}, i); }),
           carType: q.carType, carsCount: q.carsCount, region: q.city, withDriver: q.withDriver,
           startDate: q.startDate, endDate: q.endDate, days: q.days,
-          pricePerCarPerDay: q.pricePerCarPerDay, price: q.total,
-          priceVatIncluded: q.priceVatIncluded, fromQuote: true
+          pricePerCarPerDay: q.items && q.items.length === 1 ? q.items[0].pricePerCarPerDay : q.pricePerCarPerDay,
+          dailyAll: q.dailyAll, subtotal: q.subtotal, vat: q.vat,
+          price: q.grandTotal || q.total, priceVatIncluded: 'yes', fromQuote: true
         });
         d.negotiationStatus = 'تم الاتفاق';
         if (O.idx(d.stage) < 2) d.stage = 'office';
@@ -279,9 +386,12 @@ window.VH = window.VH || {};
      ===================================================================== */
   O.contractModal = function (d, after) {
     var c = d.contract || {};
+    var multi = !!(c.items && c.items.length);
     var fields = [
-      { name: 'carType', label: 'نوع السيارة', type: 'select', required: true, options: CARS.map(function (x) { return { v: x, t: x }; }), value: c.carType },
-      { name: 'carsCount', label: 'عدد السيارات', type: 'number', step: '1', min: '1', required: true, value: c.carsCount || 1 },
+      multi
+        ? { name: 'carType', label: 'أنواع السيارات (من عرض السعر)', type: 'static', value: c.carType }
+        : { name: 'carType', label: 'نوع السيارة', type: 'select', required: true, options: CARS.map(function (x) { return { v: x, t: x }; }), value: c.carType },
+      { name: 'carsCount', label: 'عدد السيارات', type: 'number', step: '1', min: '1', required: true, value: c.carsCount || 1, readonly: multi, hint: multi ? 'لتغيير الأنواع والأعداد عدّلي عرض السعر' : '' },
       { name: 'region', label: 'المنطقة', type: 'select', required: true, options: REGIONS.map(function (x) { return { v: x, t: x }; }), value: c.region },
       {
         name: 'withDriver', label: 'بسائق / بدون سائق', type: 'select',
@@ -321,7 +431,8 @@ window.VH = window.VH || {};
             if (v.endDate < v.startDate) { VH.form.error(bd, 'تاريخ النهاية قبل تاريخ البداية'); return; }
             if (!VH.num(v.price)) { VH.form.error(bd, 'أدخلي سعراً صحيحاً'); return; }
             d.contract = Object.assign({}, d.contract || {}, {
-              carType: v.carType, carsCount: VH.num(v.carsCount) || 1, region: v.region, withDriver: v.withDriver,
+              carType: multi ? c.carType : v.carType, carsCount: multi ? c.carsCount : (VH.num(v.carsCount) || 1),
+              region: v.region, withDriver: v.withDriver,
               startDate: v.startDate, endDate: v.endDate, days: VH.daysBetween(v.startDate, v.endDate),
               pricePerCarPerDay: VH.num(v.pricePerCarPerDay), price: VH.num(v.price),
               priceVatIncluded: v.priceVatIncluded
@@ -454,7 +565,11 @@ window.VH = window.VH || {};
     var v0 = (d.vehicles || []).filter(function (x) { return x.id === vid; })[0] || {};
     var drivers = VH.store.driverList();
     var fields = [
-      { name: 'carType', label: 'نوع السيارة', type: 'select', required: true, options: CARS.map(function (x) { return { v: x, t: x }; }), value: v0.carType || (d.contract || {}).carType },
+      {
+        name: 'carType', label: 'نوع السيارة', type: 'select', required: true,
+        options: CARS.map(function (x) { return { v: x, t: x }; }),
+        value: v0.carType || (((d.contract || {}).items || [])[0] || {}).carType || (d.contract || {}).carType
+      },
       { name: 'plate', label: 'رقم اللوحة', required: true, value: v0.plate, hint: 'مثال: أ ب ج 1234' },
       {
         name: 'driverName', label: 'السائق المفوّض', type: 'datalist', value: v0.driverName,
@@ -795,8 +910,14 @@ window.VH = window.VH || {};
         negotiationStatus: 'بداية التواصل', owner: '', assignee: '',
         stage: 'marketing', source: 'فورم الموقع', leadRef: l.ref || '',
         notes: 'طلب وارد من فورم الموقع — المدينة: ' + (l.city || '') +
-          ' · عدد السيارات: ' + (l.carsCount || '') + ' · بداية متوقعة: ' + (l.expectedStart || ''),
-        quote: { city: l.city || '', carsCount: VH.num(l.carsCount) || 1, startDate: l.expectedStart || '' },
+          ' · عدد السيارات: ' + (l.carsCount || '') + ' · ' + (l.withDriver || 'بسائق') +
+          (l.withDriver === 'بسائق' && VH.num(l.carsCount) > 1 ? ' (' + (l.driversCount || l.carsCount) + ' سائق لـ' + l.carsCount + ' سيارة)' : '') +
+          ' · بداية متوقعة: ' + (l.expectedStart || ''),
+        quote: {
+          city: l.city || '', carsCount: VH.num(l.carsCount) || 1, startDate: l.expectedStart || '',
+          withDriver: l.withDriver || 'بسائق', driversCount: VH.num(l.driversCount) || 0,
+          items: [{ carType: '', carsCount: VH.num(l.carsCount) || 1, withDriver: l.withDriver || 'بسائق', pricePerCarPerDay: '' }]
+        },
         contract: {}, rental: {}, vehicles: [], driver: {}, expenses: [], timeline: []
       };
       d.timeline = [{ stage: 'marketing', at: l.at || VH.stamp(), by: 'فورم الموقع', note: 'وصل طلب عرض سعر من العميل عبر الفورم' }];
@@ -1029,12 +1150,13 @@ window.VH = window.VH || {};
       (hasQ && i < 2 && !cancelled ? '<button class="btn btn--sm btn--gold" data-accept-quote>تم الاتفاق</button>' : '');
     var c2 = card(2, 'عرض السعر', cancelled ? 'is-locked' : (i >= 2 ? 'is-done' : (hasQ ? 'is-active' : (i === 0 ? 'is-locked' : 'is-active'))),
       hasQ ? '<span class="badge b-peach">أُرسل ' + VH.dateShort(String(q.sentAt || '').slice(0, 10)) + '</span>' : '<span class="badge b-gray">لم يُصدر بعد</span>',
-      hasQ ? kv([['اسم الجهة', VH.esc(q.orgName)], ['نوع السيارات', VH.esc(q.carType)], ['عدد السيارات', '<span class="num">' + q.carsCount + '</span>'],
-      ['بسائق / بدون', VH.esc(q.withDriver)], ['مدينة المشروع', VH.esc(q.city)],
+      hasQ ? kv([['اسم الجهة', VH.esc(q.orgName)], ['مدينة المشروع', VH.esc(q.city)],
       ['فترة المشروع', '<span class="num">' + VH.esc(q.startDate) + ' → ' + VH.esc(q.endDate) + '</span>'],
       ['عدد الأيام', '<span class="num">' + q.days + '</span> يوم'],
-      ['قيمة السيارة لليوم', VH.money(q.pricePerCarPerDay)],
-      ['الإجمالي', VH.money(q.total) + (q.priceVatIncluded === 'no' ? ' <span class="small muted">+ ضريبة</span>' : ' <span class="small muted">شامل الضريبة</span>')]]) +
+      ['عدد السيارات', '<span class="num">' + q.carsCount + '</span> (' + VH.esc(q.withDriver) + ')'],
+      ['الإجمالي النهائي شامل الضريبة', VH.money(q.grandTotal || q.total)]]) +
+        (q.items && q.items.length ? '<div style="margin-top:14px">' + O.quoteItemsTable(q) + '</div>'
+          : '<p class="small muted" style="margin:12px 0 0">' + VH.esc(q.carType || '') + ' — ' + VH.money(q.pricePerCarPerDay) + ' لليوم</p>') +
         (q.notes ? '<p class="small muted" style="margin:12px 0 0">📝 ' + VH.esc(q.notes) + '</p>' : '')
         : '<p class="small muted" style="margin:0">عند إصدار عرض السعر تتغيّر حالة العميل تلقائياً إلى «تم إرسال طلب السعر».</p>',
       c2act);
@@ -1047,9 +1169,10 @@ window.VH = window.VH || {};
       ['المنطقة', VH.esc(c.region)], ['بسائق / بدون', VH.esc(c.withDriver || '')],
       ['بداية الخدمة', VH.dateAr(c.startDate)], ['نهاية الخدمة', VH.dateAr(c.endDate)],
       ['عدد الأيام', '<span class="num">' + c.days + '</span> يوم'],
-      ['قيمة السيارة لليوم', VH.money(c.pricePerCarPerDay)],
-      ['السعر الإجمالي', VH.money(c.price) + (c.priceVatIncluded === 'no' ? ' <span class="small muted">+ ضريبة</span>' : ' <span class="small muted">شامل</span>')],
-      ['الضريبة المستحقة', VH.money(t.vat)]])
+      ['قيمة السيارة لليوم', c.items && c.items.length > 1 ? 'حسب النوع (انظري الجدول)' : VH.money(c.pricePerCarPerDay)],
+      ['السعر الإجمالي', VH.money(c.price) + (c.priceVatIncluded === 'no' ? ' <span class="small muted">+ ضريبة</span>' : ' <span class="small muted">شامل الضريبة</span>')],
+      ['الضريبة المستحقة', VH.money(t.vat)]]) +
+      (c.items && c.items.length ? '<div style="margin-top:14px">' + O.quoteItemsTable(O.calcQuote(c.items, c.days, t.rate)) + '</div>' : '')
         : '<p class="small muted" style="margin:0">تُنقل بيانات عرض السعر هنا تلقائياً عند الضغط على «تم الاتفاق».</p>',
       hasC ? '<button class="btn btn--sm btn--ghost" data-edit-contract>تعديل</button>'
         : (hasQ ? '<button class="btn btn--sm btn--ghost" data-edit-contract>إدخال يدوي</button>' : ''));

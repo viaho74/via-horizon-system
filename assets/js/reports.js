@@ -240,9 +240,32 @@ window.VH = window.VH || {};
     var q = d.quote || {};
     if (!q.total) { VH.toast('لا يوجد عرض سعر لطباعته', 'warn'); return; }
     var s = VH.store.settings(), c = s.company || {};
-    var rate = VH.num(s.vatRate) || 15;
-    var v = VH.vat(q.total, rate, q.priceVatIncluded !== 'no');
+    var rate = VH.num(q.vatRate) || VH.num(s.vatRate) || 15;
+    var v = q.items && q.items.length
+      ? { before: q.subtotal, vat: q.vat, total: q.grandTotal }
+      : VH.vat(q.total, rate, q.priceVatIncluded !== 'no');
     var area = document.getElementById('printArea');
+    var itemsTable = q.items && q.items.length
+      ? O_items(q)
+      : '<table><thead><tr><th>البيان</th><th style="width:14%">العدد</th><th style="width:14%">الأيام</th>' +
+        '<th style="width:18%">قيمة اليوم</th><th style="width:20%">الإجمالي</th></tr></thead><tbody>' +
+        '<tr><td>' + VH.esc(q.carType) + ' — ' + VH.esc(q.withDriver) + ' — ' + VH.esc(q.city) + '<br>' +
+        '<span style="font-size:.8rem;color:#666">من ' + VH.esc(q.startDate) + ' إلى ' + VH.esc(q.endDate) + '</span></td>' +
+        '<td class="num">' + q.carsCount + '</td><td class="num">' + q.days + '</td>' +
+        '<td class="num">' + VH.fmt(q.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(q.total) + '</td></tr>' +
+        '</tbody></table>';
+    function O_items(qq) {
+      return '<table><thead><tr><th>نوع السيارة</th><th>العدد</th><th>السائق</th><th>قيمة السيارة/اليوم</th>' +
+        '<th>إجمالي السيارة الواحدة</th><th>اليومي للنوع</th><th>إجمالي النوع</th></tr></thead><tbody>' +
+        qq.items.map(function (i) {
+          return '<tr><td>' + VH.esc(i.carType) + '</td><td class="num">' + i.carsCount + '</td><td>' + VH.esc(i.withDriver) + '</td>' +
+            '<td class="num">' + VH.fmt(i.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(i.perCarTotal) + '</td>' +
+            '<td class="num">' + VH.fmt(i.dailyTotal) + '</td><td class="num"><b>' + VH.fmt(i.total) + '</b></td></tr>';
+        }).join('') +
+        '<tr><th colspan="5" style="text-align:right">القيمة اليومية لمجموع السيارات (' + qq.carsCount + ' سيارة)</th><td class="num" colspan="2">' + VH.fmt(qq.dailyAll) + '</td></tr>' +
+        '</tbody></table>' +
+        '<p style="font-size:.85rem;color:#555;margin:10px 0 0">مدينة المشروع: ' + VH.esc(qq.city) + ' · الفترة: من ' + VH.esc(qq.startDate) + ' إلى ' + VH.esc(qq.endDate) + ' (' + qq.days + ' يوم)</p>';
+    }
 
     area.innerHTML =
       '<div class="inv">' +
@@ -263,19 +286,12 @@ window.VH = window.VH || {};
         (d.clientEmail ? '<tr><th>الإيميل</th><td class="num">' + VH.esc(d.clientEmail) + '</td></tr>' : '') +
         '</table>' +
 
-        '<h4>تفاصيل العرض</h4>' +
-        '<table><thead><tr><th>البيان</th><th style="width:14%">العدد</th><th style="width:14%">الأيام</th>' +
-        '<th style="width:18%">قيمة اليوم</th><th style="width:20%">الإجمالي</th></tr></thead><tbody>' +
-        '<tr><td>' + VH.esc(q.carType) + ' — ' + VH.esc(q.withDriver) + ' — ' + VH.esc(q.city) + '<br>' +
-        '<span style="font-size:.8rem;color:#666">من ' + VH.esc(q.startDate) + ' إلى ' + VH.esc(q.endDate) + '</span></td>' +
-        '<td class="num">' + q.carsCount + '</td><td class="num">' + q.days + '</td>' +
-        '<td class="num">' + VH.fmt(q.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(q.total) + '</td></tr>' +
-        '</tbody></table>' +
+        '<h4>تفاصيل العرض</h4>' + itemsTable +
 
         '<div class="inv__tot">' +
-          '<div><span>الإجمالي قبل الضريبة</span><span class="num">' + VH.fmt(v.before) + ' ر.س</span></div>' +
+          '<div><span>الإجمالي قبل الضريبة (' + q.days + ' يوم)</span><span class="num">' + VH.fmt(v.before) + ' ر.س</span></div>' +
           '<div><span>ضريبة القيمة المضافة (' + VH.fmt(rate) + '%)</span><span class="num">' + VH.fmt(v.vat) + ' ر.س</span></div>' +
-          '<div class="g"><span>الإجمالي</span><span class="num">' + VH.fmt(v.total) + ' ر.س</span></div>' +
+          '<div class="g"><span>الإجمالي النهائي شامل الضريبة</span><span class="num">' + VH.fmt(v.total) + ' ر.س</span></div>' +
         '</div>' +
 
         (q.notes ? '<h4>ملاحظات</h4><p style="font-size:.88rem">' + VH.esc(q.notes) + '</p>' : '') +
@@ -506,11 +522,11 @@ window.VH = window.VH || {};
       contactDate: VH.addDays(t, -20), negotiationDate: VH.addDays(t, -20),
       negotiationStatus: 'تم الاتفاق', owner: e1, assignee: e2,
       stage: 'done', notes: 'نقل معتمرين من المطار للفندق',
-      quote: {
-        orgName: 'شركة الوفاء للحج والعمرة', carType: 'هيونداي H1', carsCount: 1, city: 'مكة المكرمة',
-        withDriver: 'بسائق', startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8), days: 5,
-        pricePerCarPerDay: 1380, total: 6900, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'خليل'
-      },
+      quote: Object.assign(VH.ops.calcQuote([{ carType: 'هيونداي H1', carsCount: 1, withDriver: 'بسائق', pricePerCarPerDay: 1200 }], 5, 15), {
+        orgName: 'شركة الوفاء للحج والعمرة', city: 'مكة المكرمة',
+        startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8),
+        total: 6900, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'خليل'
+      }),
       contract: {
         carType: 'هيونداي H1', carsCount: 1, region: 'مكة المكرمة', withDriver: 'بسائق',
         startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8), days: 5,
@@ -533,11 +549,11 @@ window.VH = window.VH || {};
       contactDate: VH.addDays(t, -6), negotiationDate: VH.addDays(t, -6),
       negotiationStatus: 'تم الاتفاق', owner: e2, assignee: e3,
       stage: 'expenses',
-      quote: {
-        orgName: 'مؤسسة درب الشرق للسياحة', carType: 'جي إم سي', carsCount: 2, city: 'الرياض',
-        withDriver: 'بسائق', startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2), days: 5,
-        pricePerCarPerDay: 920, total: 9200, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'محمد'
-      },
+      quote: Object.assign(VH.ops.calcQuote([{ carType: 'جي إم سي', carsCount: 2, withDriver: 'بسائق', pricePerCarPerDay: 800 }], 5, 15), {
+        orgName: 'مؤسسة درب الشرق للسياحة', city: 'الرياض',
+        startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2),
+        total: 9200, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'محمد'
+      }),
       contract: {
         carType: 'جي إم سي', carsCount: 2, region: 'الرياض', withDriver: 'بسائق',
         startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2), days: 5,
