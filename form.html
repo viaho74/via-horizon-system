@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>اطلب عرض سعر — شركة فيا هورايزن</title>
+<meta name="description" content="اطلب عرض سعر لخدمات النقل والتأجير من شركة فيا هورايزن — نسهّل رحلتك، ونوسّع أفقك.">
+<link rel="icon" href="assets/img/logo-color.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/tokens.css?v=5">
+<style>
+*,*::before,*::after{ box-sizing:border-box }
+html,body{ margin:0; padding:0 }
+/* أعلى تحديداً من قاعدة body في tokens.css */
+html[dir="rtl"] body, body{
+  font-family:var(--vh-font-ar); color:var(--vh-text); line-height:1.8;
+  background:var(--vh-navy); min-height:100vh;
+}
+img{ max-width:100%; display:block }
+
+/* ===== الرأس ===== */
+.hero{ position:relative; overflow:hidden; padding:38px 20px 120px; text-align:center }
+.hero::after{
+  content:""; position:absolute; inset-block-start:-120px; inset-inline-start:50%; width:640px; height:640px;
+  transform:translateX(50%); background:radial-gradient(circle, rgba(214,173,85,.20), transparent 66%);
+}
+.hero > *{ position:relative; z-index:1 }
+.hero img{ width:190px; margin:0 auto 22px }
+.hero h1{ color:var(--vh-cream); font-size:clamp(1.5rem,4.4vw,2.3rem); margin:0 0 10px }
+.hero p{ color:var(--vh-gold); margin:0; font-weight:600; font-size:clamp(.9rem,2.4vw,1.05rem) }
+.hero .sub{ color:rgba(247,245,239,.66); font-weight:400; font-size:.92rem; margin-top:10px; max-width:520px; margin-inline:auto }
+
+/* ===== البطاقة ===== */
+.wrap{ max-width:760px; margin:-90px auto 0; padding:0 18px 60px; position:relative; z-index:2 }
+.card{
+  background:#fff; border-radius:var(--vh-r-lg); padding:clamp(22px,4vw,40px);
+  box-shadow:0 24px 60px rgba(5,29,51,.28);
+}
+.card__h{ display:flex; align-items:center; gap:12px; margin-bottom:6px }
+.card__h span{ width:8px; height:30px; border-radius:99px; background:var(--vh-gold); flex:0 0 auto }
+.card__h h2{ margin:0; font-size:1.2rem; color:var(--vh-navy) }
+.card > p.lead{ color:var(--vh-text-muted); font-size:.92rem; margin:0 0 26px 20px }
+
+.grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:18px }
+.f{ display:flex; flex-direction:column; gap:6px }
+.f--full{ grid-column:1/-1 }
+.f label{ font-size:.88rem; font-weight:600; color:var(--vh-navy) }
+.f label i{ color:#C0392B; font-style:normal }
+.f input,.f select{
+  padding:13px 15px; border:1.5px solid var(--vh-border); border-radius:10px;
+  font-family:inherit; font-size:.95rem; background:#fff; color:inherit; width:100%;
+}
+.f input:focus,.f select:focus{
+  outline:none; border-color:var(--vh-teal); box-shadow:0 0 0 3px rgba(0,166,180,.16);
+}
+.f input[aria-invalid="true"]{ border-color:#C0392B }
+.f .msg{ font-size:.78rem; color:#C0392B; min-height:1.1em }
+.f .hint{ font-size:.78rem; color:var(--vh-text-soft) }
+.ltr{ direction:ltr; text-align:right }
+
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  background:var(--vh-gold); color:var(--vh-navy); border:none; border-radius:var(--vh-r-pill);
+  padding:16px 26px; font-family:inherit; font-size:1rem; font-weight:700; cursor:pointer;
+  margin-top:28px; transition:.16s; min-height:54px;
+}
+.btn:hover{ transform:translateY(-2px); box-shadow:0 10px 24px rgba(214,173,85,.42) }
+.btn:focus-visible{ outline:3px solid var(--vh-teal); outline-offset:3px }
+.btn[disabled]{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none }
+
+.note{ font-size:.8rem; color:var(--vh-text-soft); text-align:center; margin:16px 0 0 }
+.formErr{
+  background:#FDEDEA; border:1px solid #F0C6C0; color:#96271A; border-radius:12px;
+  padding:12px 16px; font-size:.88rem; margin-top:18px;
+}
+
+/* ===== شاشة النجاح ===== */
+.done{ text-align:center; padding:20px 0 6px }
+.done .tick{
+  width:76px; height:76px; border-radius:50%; background:#E8F6F0; color:#1F9D6B;
+  display:grid; place-items:center; font-size:2.2rem; margin:0 auto 20px;
+}
+.done h2{ margin:0 0 10px; color:var(--vh-navy); font-size:1.35rem }
+.done p{ color:var(--vh-text-muted); margin:0 auto 8px; max-width:430px }
+.done .ref{
+  display:inline-block; margin-top:16px; background:var(--vh-surface-2); border-radius:var(--vh-r-pill);
+  padding:8px 20px; font-family:var(--vh-font-en); font-weight:700; color:var(--vh-navy);
+}
+.done .again{
+  display:inline-block; margin-top:22px; background:none; border:1.5px solid var(--vh-border);
+  border-radius:var(--vh-r-pill); padding:11px 24px; font-family:inherit; font-size:.9rem;
+  color:var(--vh-navy); cursor:pointer;
+}
+
+.foot{ text-align:center; color:rgba(247,245,239,.5); font-size:.82rem; padding:0 20px 34px }
+.foot a{ color:var(--vh-gold); text-decoration:none }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <img src="assets/img/logo-white.png" alt="شركة فيا هورايزن">
+  <h1>اطلب عرض سعر</h1>
+  <p>نسهّل رحلتك، ونوسّع أفقك</p>
+  <p class="sub">عبّئ البيانات التالية وسيصلك عرض السعر من فريقنا في أقرب وقت — نقل · سفر · سياحة</p>
+</header>
+
+<div class="wrap">
+  <div class="card" id="card">
+
+    <form id="leadForm" novalidate>
+      <div class="card__h"><span></span><h2>بيانات الطلب</h2></div>
+      <p class="lead">الحقول المعلّمة بـ <i style="color:#C0392B;font-style:normal">*</i> مطلوبة.</p>
+
+      <div class="grid">
+        <div class="f f--full">
+          <label for="orgName">اسم الجهة <i>*</i></label>
+          <input id="orgName" name="orgName" type="text" maxlength="120" autocomplete="organization" required>
+          <span class="msg" data-msg="orgName"></span>
+        </div>
+
+        <div class="f">
+          <label for="contactName">اسم المسؤول <i>*</i></label>
+          <input id="contactName" name="contactName" type="text" maxlength="80" autocomplete="name" required>
+          <span class="msg" data-msg="contactName"></span>
+        </div>
+
+        <div class="f">
+          <label for="jobTitle">المسمى الوظيفي</label>
+          <input id="jobTitle" name="jobTitle" type="text" maxlength="80" autocomplete="organization-title">
+          <span class="msg" data-msg="jobTitle"></span>
+        </div>
+
+        <div class="f">
+          <label for="email">البريد الإلكتروني <i>*</i></label>
+          <input id="email" name="email" type="email" class="ltr" maxlength="120" autocomplete="email" inputmode="email" required>
+          <span class="msg" data-msg="email"></span>
+        </div>
+
+        <div class="f">
+          <label for="phone">رقم الجوال <i>*</i></label>
+          <input id="phone" name="phone" type="tel" class="ltr" maxlength="20" autocomplete="tel"
+                 inputmode="tel" placeholder="05XXXXXXXX" required>
+          <span class="msg" data-msg="phone"></span>
+        </div>
+
+        <div class="f">
+          <label for="city">المدينة <i>*</i></label>
+          <select id="city" name="city" required>
+            <option value="">— اختر المدينة —</option>
+          </select>
+          <span class="msg" data-msg="city"></span>
+        </div>
+
+        <div class="f">
+          <label for="carsCount">عدد السيارات <i>*</i></label>
+          <input id="carsCount" name="carsCount" type="number" class="ltr" min="1" max="200" step="1" required>
+          <span class="msg" data-msg="carsCount"></span>
+        </div>
+
+        <div class="f f--full">
+          <label for="expectedStart">بداية المشروع المتوقعة <i>*</i></label>
+          <input id="expectedStart" name="expectedStart" type="date" class="ltr" required>
+          <span class="hint">التاريخ التقريبي لبدء الخدمة — يمكن تعديله لاحقاً مع فريقنا.</span>
+          <span class="msg" data-msg="expectedStart"></span>
+        </div>
+      </div>
+
+      <div id="formErr" class="formErr" hidden role="alert"></div>
+      <button class="btn" type="submit" id="submitBtn">إرسال الطلب</button>
+      <p class="note">بإرسال الطلب توافق على تواصل فريق فيا هورايزن معك بخصوص طلبك.</p>
+    </form>
+
+    <div class="done" id="done" hidden>
+      <div class="tick">✓</div>
+      <h2>وصلنا طلبك بنجاح</h2>
+      <p>شكراً لك — سجّلنا بياناتك وسيتواصل معك فريق المبيعات لإرسال عرض السعر.</p>
+      <div class="ref" id="refNo"></div><br>
+      <button class="again" type="button" id="againBtn">إرسال طلب آخر</button>
+    </div>
+
+  </div>
+</div>
+
+<p class="foot">© شركة فيا هورايزن · <a href="https://viahorizon.sa" target="_blank" rel="noopener">viahorizon.sa</a></p>
+
+<script src="assets/js/config.js?v=5"></script>
+<script src="assets/js/form.js?v=5"></script>
+</body>
+</html>

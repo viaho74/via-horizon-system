@@ -26,6 +26,30 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
+    // طلبات عروض الأسعار الواردة من فورم الموقع (form.html)
+    // العميل غير مسجّل دخول، لذا يُسمح بالإنشاء فقط ضمن شروط صارمة،
+    // ولا يُسمح بالقراءة أو التعديل أو الحذف إلا لموظفي الشركة.
+    match /leads/{leadId} {
+      allow create: if request.resource.data.keys().hasOnly(
+                        ['id','ref','orgName','contactName','jobTitle','email','phone',
+                         'city','carsCount','expectedStart','at','source','converted','dealId'])
+                    && request.resource.data.converted == false
+                    && request.resource.data.source == 'form'
+                    && request.resource.data.orgName is string
+                    && request.resource.data.orgName.size() > 0
+                    && request.resource.data.orgName.size() <= 120
+                    && request.resource.data.contactName is string
+                    && request.resource.data.contactName.size() <= 80
+                    && request.resource.data.email is string
+                    && request.resource.data.email.size() <= 120
+                    && request.resource.data.phone is string
+                    && request.resource.data.phone.size() <= 20
+                    && request.resource.data.carsCount is number
+                    && request.resource.data.carsCount > 0
+                    && request.resource.data.carsCount <= 200;
+      allow read, update, delete: if signedIn();
+    }
+
     // سجل السائقين
     match /drivers/{driverId} {
       allow read, write: if signedIn();

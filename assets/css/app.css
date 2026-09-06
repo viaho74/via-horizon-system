@@ -1,4 +1,4 @@
-/* =====================================================================
+﻿/* =====================================================================
    نظام فيا هورايزن — واجهة اللوحة
    يعتمد على متغيّرات الهوية في tokens.css
    ===================================================================== */
@@ -16,7 +16,8 @@
 
 *,*::before,*::after{ box-sizing:border-box }
 html,body{ margin:0; padding:0 }
-body{
+/* أعلى تحديداً من قاعدة body في tokens.css */
+html[dir="rtl"] body, body{
   font-family: var(--vh-font-ar);
   background: #F3F1EA;
   color: var(--vh-text);
@@ -268,7 +269,7 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
 .b-lime{ background:#EDF7DC; color:#5A8A2A }
 
 /* ===================== لوحة العمليات (كانبان) ===================== */
-.board{ display:grid; grid-template-columns:repeat(8,minmax(215px,1fr)); gap:12px; overflow-x:auto; padding-bottom:10px }
+.board{ display:grid; grid-template-columns:repeat(7,minmax(225px,1fr)); gap:12px; overflow-x:auto; padding-bottom:10px }
 .col{
   background:var(--col-bg,#EDEAE1); border-radius:var(--vh-r); padding:10px; min-height:180px;
   border-top:4px solid var(--col-dot,#ccc);
@@ -367,6 +368,6 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
   .side-backdrop.is-on{ opacity:1; pointer-events:auto }
   .only-mobile{ display:inline-flex }
   .topbar{ padding:14px 16px 12px } .view{ padding:0 16px 50px }
-  .board{ grid-template-columns:repeat(8,minmax(215px,1fr)) }
+  .board{ grid-template-columns:repeat(7,minmax(225px,1fr)) }
   .login__people{ grid-template-columns:repeat(2,1fr) }
 }

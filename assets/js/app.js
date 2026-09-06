@@ -86,6 +86,12 @@ window.VH = window.VH || {};
   };
 
   A.render = function () {
+    // أي طلب جديد وصل من فورم الموقع يُضاف فوراً كعميل في خطة سير العمل
+    try {
+      var added = VH.ops.convertLeads();
+      if (added) VH.toast('وصل ' + (added === 1 ? 'طلب جديد' : added + ' طلبات جديدة') + ' من فورم الموقع', 'ok', 5000);
+    } catch (e) { console.error('تعذّر تحويل الطلبات الواردة', e); }
+
     var route = A.route(), portal = route.charAt(0) === 'f' ? 'f' : 'o';
     var v = A.view(route);
     if (!v) return;
@@ -95,10 +101,15 @@ window.VH = window.VH || {};
       b.classList.toggle('is-on', b.getAttribute('data-portal') === portal);
       b.hidden = b.getAttribute('data-portal') === 'f' && !VH.auth.can('finance');
     });
-    var openDeals = VH.store.list('deals').filter(function (d) { return d.stage !== 'done' && d.stage !== 'cancelled'; }).length;
+    var openDeals = VH.store.list('deals').filter(function (d) {
+      return d.stage !== 'done' && d.stage !== 'cancelled' && d.stage !== 'marketing';
+    }).length;
     var unpaid = VH.store.list('invoices').filter(function (i) { return i.status !== 'paid' && i.direction === 'in'; }).length;
+    var newLeads = VH.store.list('deals').filter(function (d) { return !d.owner && d.stage !== 'cancelled'; }).length;
     document.getElementById('nav').innerHTML = NAV[portal].map(function (n) {
-      var c = n.r === 'o/board' && openDeals ? openDeals : (n.r === 'f/payments' && unpaid ? unpaid : 0);
+      var c = n.r === 'o/board' && openDeals ? openDeals
+        : (n.r === 'o/marketing' && newLeads ? newLeads
+          : (n.r === 'f/payments' && unpaid ? unpaid : 0));
       var on = route === n.r || (n.r === 'o/deals' && route.indexOf('o/deal/') === 0);
       return '<a href="#/' + n.r + '" class="' + (on ? 'is-on' : '') + '"><span class="ico">' + n.i + '</span>' +
         '<span>' + n.t + '</span>' + (c ? '<span class="count">' + c + '</span>' : '') + '</a>';

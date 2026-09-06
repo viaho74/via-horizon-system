@@ -731,7 +731,8 @@ window.VH = window.VH || {};
   O.board = function () {
     var f = O._bf || {};
     var all = O.filtered(f);
-    var cols = VH.STAGES.filter(function (s) { return s.k !== 'cancelled'; });
+    // مرحلة التسويق مكانها صفحة «تسويق المبيعات» وحدها ولا تظهر في لوحة العمليات
+    var cols = VH.STAGES.filter(function (s) { return s.k !== 'cancelled' && s.k !== 'marketing'; });
     var cancelled = all.filter(function (d) { return d.stage === 'cancelled'; });
     var staff = VH.store.staff();
 
@@ -773,6 +774,45 @@ window.VH = window.VH || {};
   };
 
   /* =====================================================================
+     الطلبات الواردة من فورم الموقع → تُضاف تلقائياً كعملاء جدد
+     ===================================================================== */
+  O.pendingLeads = function () {
+    return VH.store.list('leads').filter(function (l) { return !l.converted; });
+  };
+  /** يحوّل كل طلب جديد إلى عميل في مرحلة التسويق ويُدرجه في خطة سير العمل */
+  O.convertLeads = function () {
+    var pending = O.pendingLeads();
+    if (!pending.length) return 0;
+    pending.sort(function (a, b) { return String(a.at).localeCompare(String(b.at)); });
+    pending.forEach(function (l) {
+      var seq = VH.num(VH.store.settings().dealSeq) || 1;
+      var day = String(l.at || VH.stamp()).slice(0, 10);
+      var d = {
+        code: 'C-' + (1000 + seq),
+        orgName: l.orgName, clientName: l.contactName, jobTitle: l.jobTitle || '',
+        clientPhone: l.phone, clientEmail: l.email,
+        contactDate: day, negotiationDate: day,
+        negotiationStatus: 'بداية التواصل', owner: '', assignee: '',
+        stage: 'marketing', source: 'فورم الموقع', leadRef: l.ref || '',
+        notes: 'طلب وارد من فورم الموقع — المدينة: ' + (l.city || '') +
+          ' · عدد السيارات: ' + (l.carsCount || '') + ' · بداية متوقعة: ' + (l.expectedStart || ''),
+        quote: { city: l.city || '', carsCount: VH.num(l.carsCount) || 1, startDate: l.expectedStart || '' },
+        contract: {}, rental: {}, vehicles: [], driver: {}, expenses: [], timeline: []
+      };
+      d.timeline = [{ stage: 'marketing', at: l.at || VH.stamp(), by: 'فورم الموقع', note: 'وصل طلب عرض سعر من العميل عبر الفورم' }];
+      VH.store.save('deals', d);
+      VH.store.saveSettings({ dealSeq: seq + 1 });
+      l.converted = true; l.dealId = d.id;
+      VH.store.save('leads', l);
+      VH.store.log('طلب وارد', d.code + ' — ' + d.orgName + ' (فورم الموقع)', d.id);
+    });
+    return pending.length;
+  };
+  O.formUrl = function () {
+    return location.href.replace(/[^/]*(\?[^#]*)?(#.*)?$/, '') + 'form.html';
+  };
+
+  /* =====================================================================
      العرض — تسويق المبيعات
      ===================================================================== */
   O.marketing = function () {
@@ -783,6 +823,9 @@ window.VH = window.VH || {};
     var agreed = inRange.filter(function (d) { return d.negotiationStatus === 'تم الاتفاق' || O.idx(d.stage) >= 2; });
     var lost = inRange.filter(function (d) { return d.stage === 'cancelled'; });
 
+    var fromForm = inRange.filter(function (d) { return d.source === 'فورم الموقع'; });
+    var unassigned = all.filter(function (d) { return !d.owner && d.stage !== 'cancelled'; });
+
     var rows = inRange.slice().sort(function (a, b) {
       return String(b.contactDate || '').localeCompare(String(a.contactDate || ''));
     }).map(function (d) {
@@ -791,25 +834,43 @@ window.VH = window.VH || {};
         '<td>' + VH.esc(VH.dayName(d.contactDate || d.negotiationDate)) + '</td>' +
         '<td class="n">' + VH.dateShort(d.contactDate || d.negotiationDate) + '</td>' +
         '<td class="n">' + VH.esc(d.code) + '</td>' +
-        '<td><b>' + VH.esc(d.orgName || '—') + '</b></td>' +
-        '<td>' + VH.esc(d.clientName || '—') + '</td>' +
+        '<td><b>' + VH.esc(d.orgName || '—') + '</b>' +
+        (d.source === 'فورم الموقع' ? ' <span class="badge b-peach">من الفورم</span>' : '') + '</td>' +
+        '<td>' + VH.esc(d.clientName || '—') +
+        (d.jobTitle ? '<br><span class="small muted">' + VH.esc(d.jobTitle) + '</span>' : '') + '</td>' +
         '<td class="n">' + VH.esc(d.clientPhone || '—') + '</td>' +
         '<td class="n">' + VH.esc(d.clientEmail || '—') + '</td>' +
         '<td>' + VH.statusBadge(d.negotiationStatus) + '</td>' +
         '<td>' + VH.stageBadge(d.stage) + '</td>' +
-        '<td>' + VH.avatar(VH.store.employeeName(d.owner)) + ' ' + VH.esc(VH.store.employeeName(d.owner)) + '</td>' +
+        '<td>' + (d.owner ? VH.avatar(VH.store.employeeName(d.owner)) + ' ' + VH.esc(VH.store.employeeName(d.owner))
+          : '<span class="badge b-red">غير مسند</span>') + '</td>' +
         '<td class="actions">' +
         (wa ? '<a class="btn btn--sm btn--teal" target="_blank" rel="noopener" href="https://wa.me/' + wa + '">واتساب</a>' : '') +
         '<button class="btn btn--sm btn--ghost" data-go="' + d.id + '">فتح</button></td>' +
         '</tr>';
     }).join('');
 
-    var html = VH.app.periodBar() +
+    var html =
+      '<div class="strip strip--info"><span class="strip__ico">🔗</span>' +
+      '<div><b>رابط فورم طلب عرض السعر</b>' +
+      '<small>انشريه في الموقع أو السوشيال — كل طلب يصل يُضاف تلقائياً كعميل جديد هنا وفي خطة سير العمل</small></div>' +
+      '<span class="sp"></span>' +
+      '<code class="small n" id="formLink" style="background:#fff;padding:6px 12px;border-radius:8px;max-width:340px;overflow:auto;white-space:nowrap">' +
+      VH.esc(O.formUrl()) + '</code>' +
+      '<button class="btn btn--sm btn--ghost" data-copy-form>نسخ الرابط</button>' +
+      '<a class="btn btn--sm btn--navy" href="form.html" target="_blank" rel="noopener">فتح الفورم</a>' +
+      '</div>' +
+
+      (unassigned.length ? '<div class="strip strip--warn"><span class="strip__ico">!</span>' +
+        '<div><b>' + unassigned.length + ' عميل بلا موظف مسؤول</b>' +
+        '<small>' + unassigned.slice(0, 6).map(function (d) { return VH.esc(d.orgName || d.clientName); }).join(' · ') + '</small></div></div>' : '') +
+
+      VH.app.periodBar() +
       '<div class="grid grid--4" style="margin-bottom:16px">' +
       VH.statCard({ count: true, title: 'عدد العملاء الذين تم التواصل معهم', value: inRange.length, cls: 'stat--navy', desc: 'خلال الفترة المختارة' }) +
-      VH.statCard({ count: true, title: 'أُرسل لهم طلب سعر', value: sent.length, cls: 'stat--net', desc: inRange.length ? VH.fmt(sent.length / inRange.length * 100) + '% من المتواصَل معهم' : '' }) +
+      VH.statCard({ count: true, title: 'أُرسل لهم عروض الأسعار', value: sent.length, cls: 'stat--net', desc: inRange.length ? VH.fmt(sent.length / inRange.length * 100) + '% من المتواصَل معهم' : '' }) +
       VH.statCard({ count: true, title: 'تم الاتفاق معهم', value: agreed.length, cls: 'stat--in', desc: inRange.length ? 'نسبة التحويل ' + VH.fmt(agreed.length / inRange.length * 100) + '%' : '' }) +
-      VH.statCard({ count: true, title: 'ملغية', value: lost.length, cls: 'stat--out', desc: 'لم تكتمل' }) +
+      VH.statCard({ count: true, title: 'طلبات واردة من الفورم', value: fromForm.length, cls: 'stat--out', desc: lost.length + ' ملغية خلال الفترة' }) +
       '</div>' +
       (inRange.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr>' +
         '<th>اليوم</th><th>التاريخ</th><th>رقم العميل</th><th>اسم الجهة</th><th>اسم العميل</th><th>رقم الجوال</th>' +
@@ -822,7 +883,16 @@ window.VH = window.VH || {};
       actions: '<button class="btn btn--ghost" data-export-mk>تصدير CSV</button>' +
         '<button class="btn btn--gold" data-new-deal>+ عميل جديد</button>',
       html: html,
-      mount: function (root) { VH.app.bindPeriod(root); }
+      mount: function (root) {
+        VH.app.bindPeriod(root);
+        var cp = root.querySelector('[data-copy-form]');
+        if (cp) cp.addEventListener('click', function () {
+          var url = O.formUrl();
+          if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { VH.toast('نُسخ رابط الفورم', 'ok'); })
+            .catch(function () { VH.toast(url, 'warn', 8000); });
+          else VH.toast(url, 'warn', 8000);
+        });
+      }
     };
   };
 

@@ -9,7 +9,7 @@ window.VH = window.VH || {};
   'use strict';
 
   var LS_KEY = 'vh_sys_v1';
-  var COLS = ['deals', 'invoices', 'audit', 'drivers'];
+  var COLS = ['deals', 'invoices', 'audit', 'drivers', 'leads'];
   var CFG = window.VH_CONFIG || {};
 
   var DEFAULT_SETTINGS = {
@@ -34,7 +34,7 @@ window.VH = window.VH || {};
   var S = {
     mode: 'local',
     online: false,
-    data: { deals: {}, invoices: {}, audit: {}, drivers: {}, settings: null },
+    data: { deals: {}, invoices: {}, audit: {}, drivers: {}, leads: {}, settings: null },
     _subs: [],
     _fb: null,        // { app, auth, db }
     _unsub: []
@@ -48,7 +48,7 @@ window.VH = window.VH || {};
   function localWrite() {
     var out = {
       deals: S.data.deals, invoices: S.data.invoices, audit: S.data.audit,
-      drivers: S.data.drivers, settings: S.data.settings
+      drivers: S.data.drivers, leads: S.data.leads, settings: S.data.settings
     };
     try { localStorage.setItem(LS_KEY, JSON.stringify(out)); }
     catch (e) { console.error('تعذّر الحفظ محلياً', e); }
@@ -73,6 +73,7 @@ window.VH = window.VH || {};
     S.data.invoices = raw.invoices || {};
     S.data.audit = raw.audit || {};
     S.data.drivers = raw.drivers || {};
+    S.data.leads = raw.leads || {};
     S.data.settings = Object.assign({}, DEFAULT_SETTINGS, raw.settings || {});
     S.data.settings.company = Object.assign({}, DEFAULT_SETTINGS.company, (raw.settings || {}).company || {});
 
@@ -222,7 +223,7 @@ window.VH = window.VH || {};
     return JSON.stringify({
       _system: 'via-horizon-system', _version: 2, _at: VH.stamp(),
       deals: S.data.deals, invoices: S.data.invoices, audit: S.data.audit,
-      drivers: S.data.drivers, settings: S.data.settings
+      drivers: S.data.drivers, leads: S.data.leads, settings: S.data.settings
     }, null, 2);
   };
 
