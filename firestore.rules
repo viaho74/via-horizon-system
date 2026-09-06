@@ -32,8 +32,11 @@ service cloud.firestore {
     match /leads/{leadId} {
       allow create: if request.resource.data.keys().hasOnly(
                         ['id','ref','orgName','contactName','jobTitle','email','phone',
-                         'city','carsCount','withDriver','driversCount','expectedStart',
+                         'city','cars','carsCount','withDriver','expectedStart','expectedEnd',
                          'at','source','converted','dealId'])
+                    && request.resource.data.cars is list
+                    && request.resource.data.cars.size() >= 1
+                    && request.resource.data.cars.size() <= 12
                     && request.resource.data.converted == false
                     && request.resource.data.source == 'form'
                     && request.resource.data.orgName is string

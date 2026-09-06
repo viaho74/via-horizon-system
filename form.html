@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/tokens.css?v=6">
+<link rel="stylesheet" href="assets/css/tokens.css?v=7">
 <style>
 *,*::before,*::after{ box-sizing:border-box }
 html,body{ margin:0; padding:0 }
@@ -59,6 +59,20 @@ img{ max-width:100%; display:block }
 .f .msg{ font-size:.78rem; color:#C0392B; min-height:1.1em }
 .f .hint{ font-size:.78rem; color:var(--vh-text-soft) }
 .ltr{ direction:ltr; text-align:right }
+
+/* صفوف أنواع السيارات */
+.cars{ display:grid; gap:10px }
+.car{ display:grid; grid-template-columns:1fr 110px 40px; gap:10px; align-items:center }
+.car input,.car select{ padding:12px 14px; border:1.5px solid var(--vh-border); border-radius:10px; font-family:inherit; font-size:.95rem; width:100% }
+.car input:focus,.car select:focus{ outline:none; border-color:var(--vh-teal); box-shadow:0 0 0 3px rgba(0,166,180,.16) }
+.car .rm{ width:40px; height:40px; border-radius:50%; border:1.5px solid var(--vh-border); background:#fff; color:#C0392B; font-size:1.1rem; cursor:pointer }
+.car .rm[disabled]{ opacity:.3; cursor:default }
+.addcar{
+  justify-self:start; background:none; border:1.5px dashed var(--vh-gold); color:var(--vh-navy); border-radius:var(--vh-r-pill);
+  padding:8px 18px; font-family:inherit; font-size:.85rem; font-weight:600; cursor:pointer; margin-top:4px;
+}
+.addcar:hover{ background:rgba(214,173,85,.12) }
+@media (max-width:480px){ .car{ grid-template-columns:1fr 84px 36px } }
 
 .btn{
   display:inline-flex; align-items:center; justify-content:center; gap:8px; width:100%;
@@ -154,10 +168,12 @@ img{ max-width:100%; display:block }
           <span class="msg" data-msg="city"></span>
         </div>
 
-        <div class="f">
-          <label for="carsCount">عدد السيارات <i>*</i></label>
-          <input id="carsCount" name="carsCount" type="number" class="ltr" min="1" max="200" step="1" required>
-          <span class="msg" data-msg="carsCount"></span>
+        <div class="f f--full">
+          <label>نوع السيارات وعددها <i>*</i></label>
+          <div id="carsBox" class="cars"></div>
+          <button type="button" class="addcar" id="addCar">+ إضافة نوع سيارة آخر</button>
+          <span class="hint">اختر نوع السيارة والعدد المطلوب منه — ويمكنك إضافة أكثر من نوع.</span>
+          <span class="msg" data-msg="cars"></span>
         </div>
 
         <div class="f">
@@ -169,18 +185,17 @@ img{ max-width:100%; display:block }
           <span class="msg" data-msg="withDriver"></span>
         </div>
 
-        <div class="f" id="driversWrap" hidden>
-          <label for="driversCount">كم سيارة تحتاج سائقاً؟ <i>*</i></label>
-          <input id="driversCount" name="driversCount" type="number" class="ltr" min="1" max="200" step="1">
-          <span class="hint" id="driversHint"></span>
-          <span class="msg" data-msg="driversCount"></span>
-        </div>
-
-        <div class="f f--full">
+        <div class="f">
           <label for="expectedStart">بداية المشروع المتوقعة <i>*</i></label>
           <input id="expectedStart" name="expectedStart" type="date" class="ltr" required>
-          <span class="hint">التاريخ التقريبي لبدء الخدمة — يمكن تعديله لاحقاً مع فريقنا.</span>
           <span class="msg" data-msg="expectedStart"></span>
+        </div>
+
+        <div class="f">
+          <label for="expectedEnd">نهاية المشروع المتوقعة <i>*</i></label>
+          <input id="expectedEnd" name="expectedEnd" type="date" class="ltr" required>
+          <span class="hint" id="daysHint">التواريخ تقريبية — يمكن تعديلها لاحقاً مع فريقنا.</span>
+          <span class="msg" data-msg="expectedEnd"></span>
         </div>
       </div>
 
@@ -202,7 +217,7 @@ img{ max-width:100%; display:block }
 
 <p class="foot">© شركة فيا هورايزن · <a href="https://viahorizon.sa" target="_blank" rel="noopener">viahorizon.sa</a></p>
 
-<script src="assets/js/config.js?v=6"></script>
-<script src="assets/js/form.js?v=6"></script>
+<script src="assets/js/config.js?v=7"></script>
+<script src="assets/js/form.js?v=7"></script>
 </body>
 </html>
