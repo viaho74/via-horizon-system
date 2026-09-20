@@ -343,16 +343,17 @@ window.VH = window.VH || {};
 
       '<div class="card"><div class="card__h"><h2>الموظفون</h2><span class="sp"></span>' +
       (isMgr ? '<button class="btn btn--sm btn--ghost" data-add-emp>+ إضافة موظف</button>' : '') + '</div>' +
-      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>المعرّف</th><th>الدور</th><th></th></tr></thead><tbody>' +
+      '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>المعرّف</th><th>بريد الدخول (Firebase)</th><th>الدور</th><th></th></tr></thead><tbody>' +
       (s.employees || []).map(function (e) {
         return '<tr><td><b>' + VH.esc(e.name) + '</b></td><td class="n">' + VH.esc(e.id) + '</td>' +
+          '<td class="n">' + VH.esc(VH.auth.emailFor(e.id)) + (e.email ? '' : ' <span class="badge b-gray">داخلي</span>') + '</td>' +
           '<td>' + (e.role === 'manager' ? '<span class="badge b-gold">مدير</span>' : '<span class="badge b-blue">موظف</span>') + '</td>' +
-          '<td class="actions">' + (isMgr ? '<button class="btn btn--sm btn--ghost" data-ren="' + e.id + '">تعديل الاسم</button>' +
+          '<td class="actions">' + (isMgr ? '<button class="btn btn--sm btn--ghost" data-ren="' + e.id + '">تعديل</button>' +
             (VH.store.mode === 'local' ? '<button class="btn btn--sm btn--ghost" data-reset="' + e.id + '">تصفير الرقم السري</button>' : '') +
             (e.role !== 'manager' ? '<button class="btn btn--sm btn--danger" data-rmemp="' + e.id + '">حذف</button>' : '') : '') + '</td></tr>';
       }).join('') + '</tbody></table></div>' +
       '<p class="small muted" style="margin:12px 0 0">' + (cloud
-        ? 'في الوضع السحابي يجب إنشاء حساب لكل موظف في Firebase Authentication بالبريد <span class="num">' + '&lt;المعرّف&gt;@' + VH.esc((window.VH_CONFIG || {}).authDomainSuffix || 'viahorizon.local') + '</span> وكلمة مرور من 6 خانات على الأقل.'
+        ? 'في الوضع السحابي يدخل كل موظف ببريد الدخول المذكور أعلاه وكلمة مروره في Firebase Authentication (6 خانات على الأقل). لا يستطيع أحد الدخول قبل أن تُنشئي له حساباً هناك — ويمكنك تحديد بريد حقيقي لكل موظف من زر «تعديل».'
         : 'الرقم السري الافتراضي لأول دخول هو <span class="num">1234</span> — غيّريه من الزر أدناه.') + '</p></div>' +
 
       '<div class="card"><div class="card__h"><h2>الرقم السري</h2></div>' +
@@ -428,13 +429,17 @@ window.VH = window.VH || {};
             var id = b.getAttribute('data-ren');
             var emps = (VH.store.settings().employees || []).slice();
             var e = emps.filter(function (x) { return x.id === id; })[0];
-            var fields = [{ name: 'name', label: 'الاسم', value: e.name, required: true }];
+            var fields = [
+              { name: 'name', label: 'الاسم', value: e.name, required: true },
+              { name: 'email', label: 'بريد الدخول في Firebase (اختياري)', type: 'email', value: e.email || '', attrs: ' dir="ltr"', hint: 'اتركيه فارغاً ليُستخدم البريد الداخلي ' + e.id + '@viahorizon.local' }
+            ];
             VH.modal({
-              title: 'تعديل اسم الموظف', body: VH.form.render(fields), actions: [
+              title: 'تعديل بيانات الموظف', body: VH.form.render(fields), actions: [
                 {
                   label: 'حفظ', cls: 'btn--gold', onClick: function (close, bd) {
                     var v = VH.form.validate(bd, fields); if (!v) return;
-                    e.name = v.name; VH.store.saveSettings({ employees: emps });
+                    if (v.email && v.email.indexOf('@') < 0) { VH.form.error(bd, 'البريد غير صحيح'); return; }
+                    e.name = v.name; e.email = (v.email || '').trim().toLowerCase(); VH.store.saveSettings({ employees: emps });
                     close(); VH.toast('حُفظ', 'ok'); VH.app.render();
                   }
                 }, { label: 'إلغاء', cls: 'btn--ghost' }]

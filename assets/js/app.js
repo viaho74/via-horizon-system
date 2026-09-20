@@ -194,8 +194,7 @@ window.VH = window.VH || {};
         VH.store._fb.auth.onAuthStateChanged(function (user) {
           if (handled) return;
           if (user && user.email) {
-            var id = user.email.split('@')[0];
-            var p = VH.store.employees().filter(function (e) { return e.id === id; })[0];
+            var p = VH.auth.employeeByEmail(user.email);
             if (p) {
               handled = true;
               VH.auth._set(p);

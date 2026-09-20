@@ -17,7 +17,20 @@ window.VH = window.VH || {};
     for (var i = 0; i < str.length; i++) h = (((h << 5) + h) ^ str.charCodeAt(i)) >>> 0;
     return h.toString(36);
   }
-  function email(id) { return id + '@' + (CFG.authDomainSuffix || 'viahorizon.local'); }
+  /** بريد الدخول في Firebase: البريد المحدد للموظف في الإعدادات، وإلا المعرّف@النطاق الداخلي */
+  function email(id) {
+    var p = VH.store.employees().filter(function (e) { return e.id === id; })[0];
+    if (p && p.email) return String(p.email).trim().toLowerCase();
+    return id + '@' + (CFG.authDomainSuffix || 'viahorizon.local');
+  }
+  A.emailFor = email;
+  /** الموظف المطابق لبريد Firebase (بالبريد المحدد أولاً ثم بالمعرّف) */
+  A.employeeByEmail = function (mail) {
+    mail = String(mail || '').trim().toLowerCase();
+    var list = VH.store.employees();
+    return list.filter(function (e) { return e.email && String(e.email).trim().toLowerCase() === mail; })[0]
+      || list.filter(function (e) { return email(e.id) === mail; })[0] || null;
+  };
 
   A.user = function () { return A._user; };
   A.isManager = function () { return !!A._user && A._user.role === 'manager'; };

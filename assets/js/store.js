@@ -23,7 +23,7 @@ window.VH = window.VH || {};
       { id: 'khalil', name: 'خليل', role: 'employee' },
       { id: 'mohammed', name: 'محمد', role: 'employee' },
       { id: 'moawiyah', name: 'معاوية', role: 'employee' },
-      { id: 'manager', name: 'المدير', role: 'manager' }
+      { id: 'manager', name: 'المدير', role: 'manager', email: 'info@viahorizon.com' }
     ],
     pins: {},          // للوضع المحلي فقط — قيم مُجزّأة لا نصّية
     invoiceSeq: 1,
@@ -245,6 +245,10 @@ window.VH = window.VH || {};
       if (!d.quote) { d.quote = {}; dirty = true; }
       if (dirty) { changed++; S.data.deals[d.id] = d; }
     });
+    // بريد المدير الحقيقي للدخول السحابي (للإعدادات المحفوظة قبل هذه النسخة)
+    var emps = (S.settings().employees || []).slice();
+    var mgr = emps.filter(function (e) { return e.id === 'manager'; })[0];
+    if (mgr && !mgr.email) { mgr.email = 'info@viahorizon.com'; S.saveSettings({ employees: emps }); changed++; }
     if (changed && S.mode === 'local') localWrite();
     return changed;
   };
