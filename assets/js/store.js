@@ -1,4 +1,4 @@
-/* =====================================================================
+﻿/* =====================================================================
    طبقة التخزين — واجهة واحدة لوضعين:
    • local : localStorage على هذا الجهاز (يعمل بلا إنترنت وبلا تسجيل)
    • cloud : Firebase Firestore مشترك بين كل الموظفين لحظياً
@@ -23,7 +23,7 @@ window.VH = window.VH || {};
       { id: 'khalil', name: 'خليل', role: 'employee' },
       { id: 'mohammed', name: 'محمد', role: 'employee' },
       { id: 'moawiyah', name: 'معاوية', role: 'employee' },
-      { id: 'manager', name: 'المدير', role: 'manager', email: 'info@viahorizon.com' }
+      { id: 'manager', name: 'المدير', role: 'manager', email: 'info@viahorizon.sa' }
     ],
     pins: {},          // للوضع المحلي فقط — قيم مُجزّأة لا نصّية
     invoiceSeq: 1,
@@ -248,7 +248,7 @@ window.VH = window.VH || {};
     // بريد المدير الحقيقي للدخول السحابي (للإعدادات المحفوظة قبل هذه النسخة)
     var emps = (S.settings().employees || []).slice();
     var mgr = emps.filter(function (e) { return e.id === 'manager'; })[0];
-    if (mgr && !mgr.email) { mgr.email = 'info@viahorizon.com'; S.saveSettings({ employees: emps }); changed++; }
+    if (mgr && (!mgr.email || mgr.email === 'info@viahorizon.com')) { mgr.email = 'info@viahorizon.sa'; S.saveSettings({ employees: emps }); changed++; }
     if (changed && S.mode === 'local') localWrite();
     return changed;
   };
