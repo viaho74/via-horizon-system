@@ -136,6 +136,10 @@ window.VH = window.VH || {};
   A.bindGlobal = function () {
     function all(sel, fn) { document.querySelectorAll(sel).forEach(function (e) { e.addEventListener('click', fn.bind(null, e)); }); }
     all('[data-go]', function (e) { location.hash = '#/o/deal/' + e.getAttribute('data-go'); });
+    all('[data-del-deal]', function (e) {
+      var d = VH.store.get('deals', e.getAttribute('data-del-deal'));
+      if (d) VH.ops.deleteDeal(d, A.render);
+    });
     all('[data-new-deal]', function () { VH.ops.newDeal(); });
     all('[data-export-deals]', function () { VH.ops.exportDeals(); });
     all('[data-export-exp]', function () { VH.ops.exportExpenses(); });

@@ -51,47 +51,39 @@ window.VH = window.VH || {};
     var app = document.getElementById('app');
     app.hidden = true; scr.hidden = false;
 
-    var people = VH.store.employees();
-    var box = document.getElementById('loginPeople');
-    box.innerHTML = people.map(function (p) {
-      return '<button type="button" class="person" data-id="' + p.id + '">' +
-        '<b>' + VH.esc(p.name) + '</b><small>' + (p.role === 'manager' ? 'مدير النظام' : 'موظف') + '</small></button>';
-    }).join('');
+    var emailEl = document.getElementById('loginEmail');
+    var pinEl = document.getElementById('loginPin');
+    var err = document.getElementById('loginErr');
+    var form = document.getElementById('loginForm');
 
-    var last = localStorage.getItem('vh_last_user');
-    A._pick = null;
-    box.querySelectorAll('.person').forEach(function (b) {
-      if (last && b.getAttribute('data-id') === last) { b.classList.add('is-on'); A._pick = last; }
-      b.addEventListener('click', function () {
-        box.querySelectorAll('.person').forEach(function (x) { x.classList.remove('is-on'); });
-        b.classList.add('is-on');
-        A._pick = b.getAttribute('data-id');
-        document.getElementById('loginPin').focus();
-      });
-    });
+    // تذكّر آخر بريد استُخدم على هذا الجهاز
+    var lastMail = localStorage.getItem('vh_last_email') || '';
+    if (lastMail) { emailEl.value = lastMail; setTimeout(function () { pinEl.focus(); }, 80); }
+    else setTimeout(function () { emailEl.focus(); }, 80);
 
     document.getElementById('loginMode').textContent = VH.store.mode === 'cloud'
       ? '☁ متصل بقاعدة البيانات المشتركة — البيانات تظهر عند كل الموظفين'
       : '💾 وضع محلي — البيانات محفوظة على هذا الجهاز فقط';
 
-    var err = document.getElementById('loginErr');
-    var form = document.getElementById('loginForm');
-    // ضمان عمل زر Enter من حقل الرقم السري في كل المتصفحات
-    var pinEl = document.getElementById('loginPin');
-    pinEl.onkeydown = function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); form.onsubmit(e); }
-    };
+    // ضمان عمل زر Enter في كل المتصفحات
+    [emailEl, pinEl].forEach(function (el) {
+      el.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); form.onsubmit(e); } };
+    });
+
     form.onsubmit = function (e) {
       e.preventDefault();
       err.textContent = '';
-      var pin = document.getElementById('loginPin').value.trim();
-      if (!A._pick) { err.textContent = 'اختاري اسمك أولاً'; return; }
-      if (!pin) { err.textContent = 'أدخلي الرقم السري'; return; }
+      var mail = (emailEl.value || '').trim().toLowerCase();
+      var pin = pinEl.value.trim();
+      if (!mail) { err.textContent = 'أدخلي البريد الإلكتروني'; emailEl.focus(); return; }
+      if (mail.indexOf('@') < 0) { err.textContent = 'البريد الإلكتروني غير صحيح'; emailEl.focus(); return; }
+      if (!pin) { err.textContent = 'أدخلي كلمة المرور'; pinEl.focus(); return; }
       var btn = form.querySelector('button[type=submit]');
       btn.disabled = true; btn.textContent = 'جارٍ الدخول…';
-      A.signIn(A._pick, pin).then(function () {
+      A.signInWithEmail(mail, pin).then(function () {
         btn.disabled = false; btn.textContent = 'دخول';
-        document.getElementById('loginPin').value = '';
+        pinEl.value = '';
+        localStorage.setItem('vh_last_email', mail);
         scr.hidden = true; app.hidden = false;
         onDone();
       }).catch(function (ex) {
@@ -99,6 +91,34 @@ window.VH = window.VH || {};
         err.textContent = ex && ex.message ? ex.message : 'تعذّر الدخول';
       });
     };
+  };
+
+  /** دخول بالبريد وكلمة المرور — يطابق الموظف بالبريد بعد نجاح المصادقة */
+  A.signInWithEmail = function (mail, pass) {
+    if (VH.store.mode === 'cloud') {
+      return VH.store._fb.auth.signInWithEmailAndPassword(mail, pass)
+        .then(function () { return VH.store.startSync(); })
+        .then(function () {
+          var p = A.employeeByEmail(mail);
+          if (!p) {   // حساب صالح في Firebase لكنه غير مسجّل في قائمة الموظفين
+            p = { id: mail.split('@')[0], name: mail.split('@')[0], role: 'employee', email: mail };
+          }
+          A._set(p);
+        })
+        .catch(function (e) {
+          var m = 'تعذّر الدخول';
+          if (e.code === 'auth/wrong-password' || e.code === 'auth/invalid-credential') m = 'البريد أو كلمة المرور غير صحيحة';
+          else if (e.code === 'auth/user-not-found') m = 'لا يوجد حساب بهذا البريد — أنشئيه من Firebase Authentication';
+          else if (e.code === 'auth/invalid-email') m = 'صيغة البريد غير صحيحة';
+          else if (e.code === 'auth/too-many-requests') m = 'محاولات كثيرة — انتظري دقيقة ثم أعيدي المحاولة';
+          else if (e.code === 'auth/network-request-failed') m = 'لا يوجد اتصال بالإنترنت';
+          throw new Error(m);
+        });
+    }
+    // الوضع المحلي: البريد يحدّد الموظف، وكلمة المرور تُطابق الرقم المحفوظ
+    var p = A.employeeByEmail(mail);
+    if (!p) return Promise.reject(new Error('لا يوجد موظف بهذا البريد'));
+    return A.signIn(p.id, pass);
   };
 
   A.signIn = function (id, pin) {
@@ -134,6 +154,7 @@ window.VH = window.VH || {};
   A._set = function (person) {
     A._user = { id: person.id, name: person.name, role: person.role };
     localStorage.setItem('vh_last_user', person.id);
+    if (person.email) localStorage.setItem('vh_last_email', String(person.email).toLowerCase());
     sessionStorage.setItem(SES_KEY, JSON.stringify(A._user));
   };
 

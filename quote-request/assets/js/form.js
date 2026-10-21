@@ -18,66 +18,100 @@
   var form = document.getElementById('leadForm');
   var errBox = document.getElementById('formErr');
   var btn = document.getElementById('submitBtn');
+  var carsBox = document.getElementById('carsBox');
 
-  /* ---------------- المدن والتواريخ ---------------- */
-  var citySel = document.getElementById('city');
-  CITIES.forEach(function (c) {
-    var o = document.createElement('option'); o.value = c; o.textContent = c; citySel.appendChild(o);
-  });
   var d0 = new Date();
   var today = d0.getFullYear() + '-' + String(d0.getMonth() + 1).padStart(2, '0') + '-' + String(d0.getDate()).padStart(2, '0');
-  var startEl = document.getElementById('expectedStart'), endEl = document.getElementById('expectedEnd');
-  startEl.min = today; endEl.min = today;
+
   function daysBetween(a, b) {
     if (!a || !b) return 0;
-    var x = new Date(a), y = new Date(b);
-    return Math.round((y - x) / 86400000) + 1;
+    return Math.round((new Date(b) - new Date(a)) / 86400000) + 1;
   }
-  function syncDays() {
-    if (startEl.value) endEl.min = startEl.value;
-    var n = daysBetween(startEl.value, endEl.value);
-    document.getElementById('daysHint').textContent = n > 0
-      ? 'مدة المشروع: ' + n + ' يوم — التواريخ تقريبية ويمكن تعديلها لاحقاً.'
-      : 'التواريخ تقريبية — يمكن تعديلها لاحقاً مع فريقنا.';
+  function opts(list, sel, ph) {
+    return '<option value="">' + ph + '</option>' + list.map(function (c) {
+      return '<option' + (c === sel ? ' selected' : '') + '>' + c + '</option>';
+    }).join('');
   }
-  startEl.addEventListener('change', syncDays); endEl.addEventListener('change', syncDays);
 
-  /* ---------------- صفوف أنواع السيارات ---------------- */
-  var carsBox = document.getElementById('carsBox');
-  function carRow() {
-    var row = document.createElement('div'); row.className = 'car';
+  /* ---------------- بطاقة سيارة ---------------- */
+  function carCard(prev) {
+    prev = prev || {};
+    var row = document.createElement('div');
+    row.className = 'car';
     row.innerHTML =
-      '<select data-k="carType" aria-label="نوع السيارة"><option value="">— نوع السيارة —</option>' +
-      CARS.map(function (c) { return '<option>' + c + '</option>'; }).join('') + '</select>' +
-      '<input data-k="carsCount" type="number" min="1" max="200" step="1" placeholder="العدد" inputmode="numeric" aria-label="العدد" dir="ltr">' +
-      '<button type="button" class="rm" aria-label="حذف">×</button>';
+      '<div class="car__h"><b class="ttl">السيارة</b>' +
+        '<button type="button" class="rm" aria-label="حذف هذه السيارة" title="حذف">×</button></div>' +
+
+      '<label class="fld"><span class="lbl">نوع السيارة *</span>' +
+        '<select data-k="carType">' + opts(CARS, prev.carType, '— اختر النوع —') + '</select></label>' +
+
+      '<label class="fld"><span class="lbl">العدد المطلوب *</span>' +
+        '<input data-k="carsCount" type="number" min="1" max="200" step="1" inputmode="numeric" dir="ltr" value="' + (prev.carsCount || 1) + '"></label>' +
+
+      '<label class="fld"><span class="lbl">مع سائق أو بدون *</span>' +
+        '<select data-k="withDriver"><option value="بسائق"' + (prev.withDriver !== 'بدون سائق' ? ' selected' : '') + '>مع سائق</option>' +
+        '<option value="بدون سائق"' + (prev.withDriver === 'بدون سائق' ? ' selected' : '') + '>بدون سائق</option></select></label>' +
+
+      '<label class="fld"><span class="lbl">مدينة الانطلاق *</span>' +
+        '<select data-k="fromCity">' + opts(CITIES, prev.fromCity, '— اختر المدينة —') + '</select></label>' +
+
+      '<label class="fld"><span class="lbl">مدينة الوصول *</span>' +
+        '<select data-k="toCity">' + opts(CITIES, prev.toCity, '— اختر المدينة —') + '</select></label>' +
+
+      '<label class="fld"><span class="lbl">تاريخ البداية *</span>' +
+        '<input data-k="startDate" type="date" dir="ltr" min="' + today + '" value="' + (prev.startDate || '') + '"></label>' +
+
+      '<label class="fld"><span class="lbl">تاريخ النهاية *</span>' +
+        '<input data-k="endDate" type="date" dir="ltr" min="' + today + '" value="' + (prev.endDate || '') + '"></label>' +
+
+      '<div class="days"></div>';
+
     row.querySelector('.rm').addEventListener('click', function () {
-      if (carsBox.children.length > 1) { row.remove(); syncRm(); }
+      if (carsBox.children.length > 1) { row.remove(); refresh(); }
     });
-    row.addEventListener('input', function () { showMsg('cars', ''); });
-    row.addEventListener('change', function () { showMsg('cars', ''); });
+    row.addEventListener('input', function () { showMsg('cars', ''); refresh(); });
+    row.addEventListener('change', function () { showMsg('cars', ''); refresh(); });
     return row;
   }
-  function syncRm() { [].forEach.call(carsBox.querySelectorAll('.rm'), function (b) { b.disabled = carsBox.children.length <= 1; }); }
-  function addCar() { carsBox.appendChild(carRow()); syncRm(); }
-  document.getElementById('addCar').addEventListener('click', function () { addCar(); carsBox.lastElementChild.querySelector('select').focus(); });
-  addCar();
-  function readCars() {
-    return [].map.call(carsBox.children, function (row) {
-      return { carType: row.querySelector('[data-k=carType]').value, carsCount: +row.querySelector('[data-k=carsCount]').value || 0 };
+
+  function refresh() {
+    [].forEach.call(carsBox.children, function (row, i) {
+      row.querySelector('.ttl').textContent = carsBox.children.length > 1 ? 'السيارة ' + (i + 1) : 'بيانات السيارة';
+      row.querySelector('.rm').disabled = carsBox.children.length <= 1;
+      var s = row.querySelector('[data-k=startDate]').value;
+      var e = row.querySelector('[data-k=endDate]');
+      if (s) e.min = s;
+      var n = daysBetween(s, e.value);
+      row.querySelector('.days').textContent = n > 0 ? 'المدة: ' + n + ' يوم' : '';
     });
   }
+  function addCar() {
+    var last = carsBox.lastElementChild;
+    var prev = last ? readRow(last) : {};
+    carsBox.appendChild(carCard({ fromCity: prev.fromCity, toCity: prev.toCity, startDate: prev.startDate, endDate: prev.endDate, withDriver: prev.withDriver }));
+    refresh();
+  }
+  function readRow(row) {
+    var g = function (k) { var e = row.querySelector('[data-k=' + k + ']'); return e ? e.value.trim() : ''; };
+    return {
+      carType: g('carType'), carsCount: +g('carsCount') || 0, withDriver: g('withDriver'),
+      fromCity: g('fromCity'), toCity: g('toCity'), startDate: g('startDate'), endDate: g('endDate')
+    };
+  }
+  function readCars() { return [].map.call(carsBox.children, readRow); }
+
+  document.getElementById('addCar').addEventListener('click', function () {
+    addCar();
+    carsBox.lastElementChild.querySelector('select').focus();
+  });
+  addCar();
 
   /* ---------------- التحقق ---------------- */
   var RULES = {
     orgName: { req: true, msg: 'اكتب اسم الجهة' },
     contactName: { req: true, msg: 'اكتب اسم المسؤول' },
     email: { req: true, test: function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v); }, msg: 'أدخل بريداً إلكترونياً صحيحاً (مثال: name@company.com)' },
-    phone: { req: true, test: function (v) { return /^(?:\+?966|0)?5\d{8}$/.test(v.replace(/[\s-]/g, '')); }, msg: 'أدخل رقم جوال سعودي صحيح (مثال: 0512345678)' },
-    city: { req: true, msg: 'اختر المدينة' },
-    withDriver: { req: true, msg: 'اختر مع سائق أو بدون' },
-    expectedStart: { req: true, msg: 'اختر التاريخ المتوقع لبدء المشروع' },
-    expectedEnd: { req: true, msg: 'اختر التاريخ المتوقع لنهاية المشروع' }
+    phone: { req: true, test: function (v) { return /^(?:\+?966|0)?5\d{8}$/.test(v.replace(/[\s-]/g, '')); }, msg: 'أدخل رقم جوال سعودي صحيح (مثال: 0512345678)' }
   };
 
   function showMsg(name, text) {
@@ -104,19 +138,24 @@
     });
     vals.jobTitle = (document.getElementById('jobTitle').value || '').trim();
 
-    // أنواع السيارات: كل صف يحتاج نوعاً وعدداً
-    var cars = readCars();
-    var carsBad = cars.some(function (c) { return !c.carType || c.carsCount < 1 || c.carsCount > 200; });
-    var dup = cars.map(function (c) { return c.carType; }).filter(function (t, i, a) { return t && a.indexOf(t) !== i; });
-    if (carsBad) { showMsg('cars', 'اختر نوع كل سيارة وأدخل عدداً بين 1 و 200'); if (!firstBad) firstBad = carsBox.querySelector('select'); }
-    else if (dup.length) { showMsg('cars', 'النوع «' + dup[0] + '» مكرّر — اجمع عدده في صف واحد'); if (!firstBad) firstBad = carsBox.querySelector('select'); }
-    else showMsg('cars', '');
+    // بطاقات السيارات
+    var cars = readCars(), bad = '';
+    for (var i = 0; i < cars.length; i++) {
+      var c = cars[i], n = cars.length > 1 ? ' (السيارة ' + (i + 1) + ')' : '';
+      if (!c.carType) { bad = 'اختر نوع السيارة' + n; break; }
+      if (!(c.carsCount >= 1 && c.carsCount <= 200)) { bad = 'أدخل عدداً بين 1 و 200' + n; break; }
+      if (!c.fromCity || !c.toCity) { bad = 'اختر مدينة الانطلاق ومدينة الوصول' + n; break; }
+      if (!c.startDate || !c.endDate) { bad = 'أدخل تاريخ البداية والنهاية' + n; break; }
+      if (c.endDate < c.startDate) { bad = 'تاريخ النهاية قبل تاريخ البداية' + n; break; }
+    }
+    if (!bad) {
+      var tot = cars.reduce(function (a, c2) { return a + c2.carsCount; }, 0);
+      if (tot > 200) bad = 'إجمالي عدد السيارات ' + tot + ' — للطلبات الكبيرة تواصل معنا مباشرة';
+    }
+    showMsg('cars', bad);
+    if (bad && !firstBad) firstBad = carsBox.querySelector('select');
     vals.cars = cars;
 
-    // نهاية المشروع بعد بدايته
-    if (vals.expectedStart && vals.expectedEnd && vals.expectedEnd < vals.expectedStart) {
-      showMsg('expectedEnd', 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية'); if (!firstBad) firstBad = endEl;
-    }
     if (firstBad) { firstBad.focus(); return null; }
     return vals;
   }
@@ -166,15 +205,21 @@
     var v = validate();
     if (!v) return;
 
+    var starts = v.cars.map(function (c) { return c.startDate; }).sort();
+    var ends = v.cars.map(function (c) { return c.endDate; }).sort();
+    var allDriver = v.cars.every(function (c) { return c.withDriver === 'بسائق'; });
+    var noDriver = v.cars.every(function (c) { return c.withDriver === 'بدون سائق'; });
+
     var lead = {
       id: 'lead_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
       ref: refNo(),
       orgName: v.orgName, contactName: v.contactName, jobTitle: v.jobTitle,
-      email: v.email, phone: v.phone, city: v.city,
+      email: v.email, phone: v.phone,
+      city: v.cars[0].toCity,
       cars: v.cars,
       carsCount: v.cars.reduce(function (a, c) { return a + c.carsCount; }, 0),
-      withDriver: v.withDriver,
-      expectedStart: v.expectedStart, expectedEnd: v.expectedEnd,
+      withDriver: allDriver ? 'بسائق' : (noDriver ? 'بدون سائق' : 'بعضها بسائق'),
+      expectedStart: starts[0], expectedEnd: ends[ends.length - 1],
       at: new Date().toISOString(), source: 'form',
       converted: false, dealId: ''
     };

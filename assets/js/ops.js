@@ -24,7 +24,7 @@ window.VH = window.VH || {};
     var c = d.contract || {}, r = d.rental || {}, s = VH.store.settings();
     var rate = VH.num(s.vatRate) || 15;
     var price = VH.num(c.price);
-    var incl = c.priceVatIncluded !== 'no';
+    var incl = true;   // كل الأسعار في النظام شاملة الضريبة
     var v = VH.vat(price, rate, incl);
     var exp = (d.expenses || []).reduce(function (a, e) { return a + VH.num(e.amount); }, 0);
     var rent = VH.num(r.rentTotal);
@@ -179,25 +179,37 @@ window.VH = window.VH || {};
      ② عرض السعر — إصداره يحوّل الحالة تلقائياً إلى «تم إرسال طلب السعر»
      ===================================================================== */
   /**
-   * يحسب بنود عرض السعر (أنواع متعددة، كل نوع بعدده وسعره وخيار السائق)
-   * items: [{carType, carsCount, withDriver, pricePerCarPerDay}]
-   * يعيد: البنود مع dailyTotal/total لكل بند + المجاميع + الضريبة 15% + الإجمالي النهائي
+   * يحسب بنود عرض السعر — لكل بند: النوع والعدد والسائق ومدينتا الانطلاق والوصول
+   * وتاريخا البداية والنهاية وقيمة السيارة لليوم.
+   * ⚠️ كل الأسعار المُدخلة **شاملة ضريبة القيمة المضافة** — لا تُضاف ضريبة فوقها،
+   *    بل تُحتسب الضريبة من داخل المبلغ (الإجمالي ÷ 1.15).
    */
-  O.calcQuote = function (items, days, rate) {
-    days = VH.num(days) || 0; rate = VH.num(rate) || 15;
-    var dailyAll = 0, subtotal = 0, cars = 0;
+  O.calcQuote = function (items, rate) {
+    rate = VH.num(rate) || 15;
+    var dailyAll = 0, grand = 0, cars = 0, minS = '', maxE = '';
     var out = (items || []).map(function (it) {
       var n = VH.num(it.carsCount) || 0, p = VH.num(it.pricePerCarPerDay) || 0;
+      var days = VH.num(it.days) || VH.daysBetween(it.startDate, it.endDate);
       var daily = VH.round2(p * n), total = VH.round2(daily * days);
-      dailyAll += daily; subtotal += total; cars += n;
-      return Object.assign({}, it, { carsCount: n, pricePerCarPerDay: p, dailyTotal: daily, total: total, perCarTotal: VH.round2(p * days) });
+      dailyAll += daily; grand += total; cars += n;
+      if (it.startDate && (!minS || it.startDate < minS)) minS = it.startDate;
+      if (it.endDate && (!maxE || it.endDate > maxE)) maxE = it.endDate;
+      return Object.assign({}, it, {
+        carsCount: n, pricePerCarPerDay: p, days: days,
+        dailyTotal: daily, total: total, perCarTotal: VH.round2(p * days)
+      });
     });
-    dailyAll = VH.round2(dailyAll); subtotal = VH.round2(subtotal);
-    var vat = VH.round2(subtotal * rate / 100);
+    grand = VH.round2(grand);
+    var vat = VH.round2(grand - grand / (1 + rate / 100));   // الضريبة محتسبة من داخل المبلغ
+    var cities = out.map(function (i) { return (i.fromCity || '') + '→' + (i.toCity || ''); })
+      .filter(function (c, k, a) { return c !== '→' && a.indexOf(c) === k; });
     return {
-      items: out, days: days, carsCount: cars, dailyAll: dailyAll, subtotal: subtotal,
-      vatRate: rate, vat: vat, grandTotal: VH.round2(subtotal + vat),
+      items: out, carsCount: cars, dailyAll: VH.round2(dailyAll),
+      startDate: minS, endDate: maxE, days: VH.daysBetween(minS, maxE),
+      subtotal: VH.round2(grand - vat), vatRate: rate, vat: vat, grandTotal: grand,
       carType: out.map(function (i) { return i.carType + (i.carsCount > 1 ? ' ×' + i.carsCount : ''); }).join('، '),
+      city: (out[0] || {}).toCity || '',
+      route: cities.join('، '),
       withDriver: out.every(function (i) { return i.withDriver === 'بسائق'; }) ? 'بسائق'
         : out.every(function (i) { return i.withDriver === 'بدون سائق'; }) ? 'بدون سائق' : 'بعضها بسائق'
     };
@@ -208,19 +220,22 @@ window.VH = window.VH || {};
     var items = q.items || [];
     if (!items.length) return '';
     var cls = forPrint ? '' : ' class="tbl"';
-    return '<div class="' + (forPrint ? '' : 'tbl-wrap') + '"><table' + cls + ' style="width:100%;min-width:600px"><thead><tr>' +
-      '<th>نوع السيارة</th><th>العدد</th><th>السائق</th><th>قيمة السيارة/اليوم</th><th>إجمالي السيارة الواحدة</th>' +
-      '<th>اليومي للنوع</th><th>إجمالي النوع</th></tr></thead><tbody>' +
+    var SPAN = 8;
+    return '<div class="' + (forPrint ? '' : 'tbl-wrap') + '"><table' + cls + ' style="width:100%;min-width:860px"><thead><tr>' +
+      '<th>نوع السيارة</th><th>العدد</th><th>السائق</th><th>من</th><th>إلى</th><th>الفترة</th><th>الأيام</th>' +
+      '<th>قيمة السيارة/اليوم</th><th>إجمالي النوع</th></tr></thead><tbody>' +
       items.map(function (i) {
         return '<tr><td>' + VH.esc(i.carType) + '</td><td class="num">' + i.carsCount + '</td><td>' + VH.esc(i.withDriver) + '</td>' +
-          '<td class="num">' + VH.fmt(i.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(i.perCarTotal) + '</td>' +
-          '<td class="num">' + VH.fmt(i.dailyTotal) + '</td><td class="num"><b>' + VH.fmt(i.total) + '</b></td></tr>';
+          '<td>' + VH.esc(i.fromCity || '—') + '</td><td>' + VH.esc(i.toCity || '—') + '</td>' +
+          '<td class="num" style="font-size:.85em">' + VH.esc(i.startDate || '') + '<br>' + VH.esc(i.endDate || '') + '</td>' +
+          '<td class="num">' + (i.days || 0) + '</td>' +
+          '<td class="num">' + VH.fmt(i.pricePerCarPerDay) + '</td><td class="num"><b>' + VH.fmt(i.total) + '</b></td></tr>';
       }).join('') +
       '</tbody><tfoot style="background:' + (forPrint ? '#F0EDE4' : 'var(--vh-surface-2)') + '">' +
-      '<tr><th colspan="5">القيمة اليومية لمجموع السيارات (' + q.carsCount + ' سيارة)</th><th class="num" colspan="2">' + VH.fmt(q.dailyAll) + ' ر.س</th></tr>' +
-      '<tr><th colspan="5">الإجمالي لمجموع السيارات × ' + q.days + ' يوم — قبل الضريبة</th><th class="num" colspan="2">' + VH.fmt(q.subtotal) + ' ر.س</th></tr>' +
-      '<tr><th colspan="5">ضريبة القيمة المضافة ' + VH.fmt(q.vatRate) + '%</th><th class="num" colspan="2">' + VH.fmt(q.vat) + ' ر.س</th></tr>' +
-      '<tr style="font-size:1.05em"><th colspan="5">الإجمالي النهائي شامل الضريبة</th><th class="num" colspan="2"><b>' + VH.fmt(q.grandTotal) + ' ر.س</b></th></tr>' +
+      '<tr><th colspan="' + SPAN + '">القيمة اليومية لمجموع السيارات (' + q.carsCount + ' سيارة)</th><th class="num">' + VH.fmt(q.dailyAll) + ' ر.س</th></tr>' +
+      '<tr><th colspan="' + SPAN + '">الإجمالي قبل الضريبة</th><th class="num">' + VH.fmt(q.subtotal) + ' ر.س</th></tr>' +
+      '<tr><th colspan="' + SPAN + '">ضريبة القيمة المضافة ' + VH.fmt(q.vatRate) + '% <span style="font-weight:400">(محتسبة ضمن المبلغ)</span></th><th class="num">' + VH.fmt(q.vat) + ' ر.س</th></tr>' +
+      '<tr style="font-size:1.05em"><th colspan="' + SPAN + '">الإجمالي النهائي شامل الضريبة</th><th class="num"><b>' + VH.fmt(q.grandTotal) + ' ر.س</b></th></tr>' +
       '</tfoot></table></div>';
   };
 
@@ -232,14 +247,10 @@ window.VH = window.VH || {};
 
     var fields = [
       { name: 'orgName', label: 'اسم الجهة', value: q.orgName || d.orgName, required: true },
-      { name: 'city', label: 'مدينة المشروع', type: 'select', required: true, options: REGIONS.map(function (x) { return { v: x, t: x }; }), value: q.city },
-      { name: 'startDate', label: 'فترة المشروع — من', type: 'date', required: true, value: q.startDate },
-      { name: 'endDate', label: 'فترة المشروع — إلى', type: 'date', required: true, value: q.endDate },
-      { name: 'days', label: 'عدد الأيام', type: 'number', value: q.days, readonly: true, hint: 'يُحسب تلقائياً' },
       {
         name: '_items', type: 'html', full: true,
-        html: '<label style="font-size:.82rem;font-weight:600;color:var(--vh-navy)">أنواع السيارات <span class="req">*</span> ' +
-          '<span class="hint" style="font-weight:400">— نوع في كل سطر، ولكل نوع عدده وسعره وخيار السائق</span></label>' +
+        html: '<label style="font-size:.82rem;font-weight:600;color:var(--vh-navy)">بيانات السيارات <span class="req">*</span> ' +
+          '<span class="hint" style="font-weight:400">— سطر لكل نوع: العدد والسائق ومدينتا الانطلاق والوصول وفترة التشغيل وقيمة اليوم</span></label>' +
           '<div id="qItemsBox"></div>' +
           '<button type="button" class="btn btn--sm btn--ghost" data-add-item style="margin-top:10px">+ إضافة نوع سيارة</button>'
       },
@@ -250,6 +261,11 @@ window.VH = window.VH || {};
       { name: 'notes', label: 'ملاحظات عرض السعر', type: 'textarea', full: true, rows: 2, value: q.notes }
     ];
 
+    function cityOpts(sel) {
+      return '<option value="">—</option>' + REGIONS.map(function (c) {
+        return '<option' + (c === sel ? ' selected' : '') + '>' + VH.esc(c) + '</option>';
+      }).join('');
+    }
     function rowHtml(it, i) {
       var opts = CARS.map(function (c) { return '<option' + (c === it.carType ? ' selected' : '') + '>' + VH.esc(c) + '</option>'; }).join('');
       var isOther = CARS.indexOf(it.carType) < 0 && it.carType;
@@ -259,15 +275,22 @@ window.VH = window.VH || {};
         '<input class="qin" data-k="carTypeOther" placeholder="اكتبي النوع" value="' + VH.esc(isOther ? it.carType : (it.carTypeOther || '')) + '" style="margin-top:6px"' + (it.carType === 'أخرى' || isOther ? '' : ' hidden') + '></td>' +
         '<td><input class="qin" type="number" min="1" step="1" dir="ltr" data-k="carsCount" value="' + VH.esc(it.carsCount || 1) + '"></td>' +
         '<td><select class="qin" data-k="withDriver"><option' + (it.withDriver !== 'بدون سائق' ? ' selected' : '') + '>بسائق</option><option' + (it.withDriver === 'بدون سائق' ? ' selected' : '') + '>بدون سائق</option></select></td>' +
+        '<td><select class="qin" data-k="fromCity">' + cityOpts(it.fromCity) + '</select></td>' +
+        '<td><select class="qin" data-k="toCity">' + cityOpts(it.toCity) + '</select></td>' +
+        '<td><input class="qin" type="date" dir="ltr" data-k="startDate" value="' + VH.esc(it.startDate || '') + '">' +
+        '<input class="qin" type="date" dir="ltr" data-k="endDate" value="' + VH.esc(it.endDate || '') + '" style="margin-top:6px"></td>' +
+        '<td class="n" data-days>—</td>' +
         '<td><input class="qin" type="number" min="0" step="0.01" dir="ltr" data-k="pricePerCarPerDay" value="' + VH.esc(it.pricePerCarPerDay || '') + '"></td>' +
-        '<td class="n" data-percar>—</td><td class="n" data-daily>—</td><td class="n" data-total>—</td>' +
-        '<td><button type="button" class="btn btn--sm btn--danger" data-del-item title="حذف">×</button></td></tr>';
+        '<td class="n" data-total>—</td>' +
+        '<td><button type="button" class="btn btn--sm btn--danger" data-del-item title="حذف السطر">×</button></td></tr>';
     }
     function renderItems(bd) {
       bd.querySelector('#qItemsBox').innerHTML =
-        '<div class="tbl-wrap"><table class="tbl" style="min-width:820px"><thead><tr>' +
-        '<th>نوع السيارة</th><th style="width:80px">العدد</th><th style="width:130px">السائق</th><th style="width:130px">قيمة السيارة/اليوم</th>' +
-        '<th style="width:110px">إجمالي السيارة</th><th style="width:110px">اليومي للنوع</th><th style="width:120px">إجمالي النوع</th><th style="width:44px"></th>' +
+        '<div class="tbl-wrap"><table class="tbl" style="min-width:1120px"><thead><tr>' +
+        '<th>نوع السيارة</th><th style="width:72px">العدد</th><th style="width:120px">السائق</th>' +
+        '<th style="width:130px">مدينة الانطلاق</th><th style="width:130px">مدينة الوصول</th>' +
+        '<th style="width:150px">من / إلى</th><th style="width:60px">الأيام</th>' +
+        '<th style="width:120px">قيمة اليوم</th><th style="width:110px">الإجمالي</th><th style="width:44px"></th>' +
         '</tr></thead><tbody>' + items.map(rowHtml).join('') + '</tbody></table></div>';
       recalc(bd);
     }
@@ -276,24 +299,27 @@ window.VH = window.VH || {};
         var g = function (k) { var e = tr.querySelector('[data-k=' + k + ']'); return e ? e.value : ''; };
         var type = g('carType');
         if (type === 'أخرى' && g('carTypeOther').trim()) type = g('carTypeOther').trim();
-        return { carType: type, carTypeOther: g('carTypeOther').trim(), carsCount: VH.num(g('carsCount')), withDriver: g('withDriver'), pricePerCarPerDay: VH.num(g('pricePerCarPerDay')) };
+        return {
+          carType: type, carTypeOther: g('carTypeOther').trim(), carsCount: VH.num(g('carsCount')),
+          withDriver: g('withDriver'), fromCity: g('fromCity'), toCity: g('toCity'),
+          startDate: g('startDate'), endDate: g('endDate'),
+          pricePerCarPerDay: VH.num(g('pricePerCarPerDay'))
+        };
       });
     }
     function recalc(bd) {
-      var v = VH.form.read(bd);
-      var days = (v.startDate && v.endDate) ? VH.daysBetween(v.startDate, v.endDate) : 0;
-      bd.querySelector('[data-f=days]').value = days || '';
-      var c = O.calcQuote(readItems(bd), days, rate);
+      var c = O.calcQuote(readItems(bd), rate);
       bd.querySelectorAll('#qItemsBox tbody tr').forEach(function (tr, i) {
         var it = c.items[i] || {};
-        tr.querySelector('[data-percar]').textContent = VH.fmt(it.perCarTotal || 0);
-        tr.querySelector('[data-daily]').textContent = VH.fmt(it.dailyTotal || 0);
+        tr.querySelector('[data-days]').textContent = it.days || 0;
         tr.querySelector('[data-total]').textContent = VH.fmt(it.total || 0);
       });
       bd.querySelector('#qSum').innerHTML =
-        '<div><span class="small muted">القيمة اليومية لمجموع السيارات (' + c.carsCount + ' سيارة):</span> <b class="num">' + VH.fmt(c.dailyAll) + '</b> ر.س' +
-        ' &nbsp;·&nbsp; <span class="small muted">الإجمالي قبل الضريبة (' + days + ' يوم):</span> <b class="num">' + VH.fmt(c.subtotal) + '</b> ر.س' +
-        ' &nbsp;·&nbsp; <span class="small muted">ضريبة ' + rate + '%:</span> <b class="num">' + VH.fmt(c.vat) + '</b> ر.س</div>' +
+        '<div><span class="small muted">عدد السيارات:</span> <b class="num">' + c.carsCount + '</b>' +
+        ' &nbsp;·&nbsp; <span class="small muted">القيمة اليومية لمجموعها:</span> <b class="num">' + VH.fmt(c.dailyAll) + '</b> ر.س' +
+        ' &nbsp;·&nbsp; <span class="small muted">الفترة:</span> <span class="num">' + VH.esc(c.startDate || '—') + ' → ' + VH.esc(c.endDate || '—') + '</span></div>' +
+        '<div><span class="small muted">قبل الضريبة:</span> <b class="num">' + VH.fmt(c.subtotal) + '</b> ر.س' +
+        ' &nbsp;·&nbsp; <span class="small muted">ضريبة ' + rate + '% (محتسبة ضمن المبلغ):</span> <b class="num">' + VH.fmt(c.vat) + '</b> ر.س</div>' +
         '<div style="font-size:1.05rem"><b>الإجمالي النهائي شامل الضريبة: <span class="num">' + VH.fmt(c.grandTotal) + '</span> ر.س</b></div>';
     }
 
@@ -311,7 +337,13 @@ window.VH = window.VH || {};
         });
         bd.addEventListener('click', function (e) {
           if (e.target.closest('[data-add-item]')) {
-            items = readItems(bd); items.push({ carType: CARS[0], carsCount: 1, withDriver: 'بسائق', pricePerCarPerDay: '' });
+            items = readItems(bd);
+            var prev = items[items.length - 1] || {};
+            items.push({
+              carType: CARS[0], carsCount: 1, withDriver: 'بسائق', pricePerCarPerDay: '',
+              fromCity: prev.fromCity || '', toCity: prev.toCity || '',
+              startDate: prev.startDate || '', endDate: prev.endDate || ''
+            });
             renderItems(bd);
           }
           var del = e.target.closest('[data-del-item]');
@@ -327,14 +359,23 @@ window.VH = window.VH || {};
         {
           label: q.sentAt ? 'حفظ التعديل' : 'إصدار وإرسال عرض السعر', cls: 'btn--gold', onClick: function (close, bd) {
             var v = VH.form.validate(bd, fields); if (!v) return;
-            if (v.endDate < v.startDate) { VH.form.error(bd, 'تاريخ النهاية قبل تاريخ البداية'); return; }
             var list = readItems(bd);
-            var bad = list.filter(function (i) { return !i.carType || i.carsCount < 1 || i.pricePerCarPerDay <= 0; });
-            if (bad.length) { VH.form.error(bd, 'أكملي كل سطر: نوع السيارة وعدد ≥ 1 وقيمة اليوم أكبر من صفر'); return; }
-            var days = VH.daysBetween(v.startDate, v.endDate);
-            var c = O.calcQuote(list, days, rate);
+            if (list.some(function (i) { return !i.carType || i.carsCount < 1 || i.pricePerCarPerDay <= 0; })) {
+              VH.form.error(bd, 'أكملي كل سطر: نوع السيارة وعدد ≥ 1 وقيمة اليوم أكبر من صفر'); return;
+            }
+            if (list.some(function (i) { return !i.fromCity || !i.toCity; })) {
+              VH.form.error(bd, 'اختاري مدينة الانطلاق ومدينة الوصول لكل سطر'); return;
+            }
+            if (list.some(function (i) { return !i.startDate || !i.endDate; })) {
+              VH.form.error(bd, 'أدخلي تاريخ البداية والنهاية لكل سطر'); return;
+            }
+            if (list.some(function (i) { return i.endDate < i.startDate; })) {
+              VH.form.error(bd, 'في أحد الأسطر تاريخ النهاية قبل تاريخ البداية'); return;
+            }
+            var c = O.calcQuote(list, rate);
+            var days = c.days;
             d.quote = Object.assign(c, {
-              orgName: v.orgName, city: v.city, startDate: v.startDate, endDate: v.endDate,
+              orgName: v.orgName,
               total: c.grandTotal, priceVatIncluded: 'yes', notes: v.notes,
               sentAt: d.quote && d.quote.sentAt ? d.quote.sentAt : VH.stamp(),
               sentBy: (VH.auth.user() || {}).name
@@ -367,7 +408,7 @@ window.VH = window.VH || {};
   O.contractFromQuote = function (q, base) {
     return Object.assign({}, base || {}, {
       items: (q.items || []).map(function (i) { return Object.assign({}, i); }),
-      carType: q.carType, carsCount: q.carsCount, region: q.city, withDriver: q.withDriver,
+      carType: q.carType, carsCount: q.carsCount, region: q.city, route: q.route, withDriver: q.withDriver,
       startDate: q.startDate, endDate: q.endDate, days: q.days,
       pricePerCarPerDay: q.items && q.items.length === 1 ? q.items[0].pricePerCarPerDay : q.pricePerCarPerDay,
       dailyAll: q.dailyAll, subtotal: q.subtotal, vat: q.vat,
@@ -412,11 +453,9 @@ window.VH = window.VH || {};
       { name: 'endDate', label: 'نهاية الخدمة', type: 'date', required: true, value: c.endDate },
       { name: 'days', label: 'عدد الأيام', type: 'number', value: c.days, readonly: true, hint: 'يُحسب تلقائياً شاملاً يومي البداية والنهاية' },
       { name: 'pricePerCarPerDay', label: 'قيمة السيارة لليوم', type: 'number', value: c.pricePerCarPerDay },
-      { name: 'price', label: 'السعر الإجمالي للعميل', type: 'number', required: true, value: c.price },
       {
-        name: 'priceVatIncluded', label: 'هل السعر شامل الضريبة؟', type: 'select',
-        options: [{ v: 'yes', t: 'نعم — شامل الضريبة' }, { v: 'no', t: 'لا — يُضاف عليه 15%' }],
-        value: c.priceVatIncluded || 'yes'
+        name: 'price', label: 'السعر الإجمالي للعميل', type: 'number', required: true, value: c.price,
+        hint: 'المبلغ شامل ضريبة القيمة المضافة — لا تُضاف عليه ضريبة'
       }
     ];
     VH.modal({
@@ -446,7 +485,7 @@ window.VH = window.VH || {};
               region: v.region, withDriver: v.withDriver, manualEdit: true,
               startDate: v.startDate, endDate: v.endDate, days: VH.daysBetween(v.startDate, v.endDate),
               pricePerCarPerDay: VH.num(v.pricePerCarPerDay), price: VH.num(v.price),
-              priceVatIncluded: v.priceVatIncluded
+              priceVatIncluded: 'yes'
             });
             var moved = false;
             if (O.idx(d.stage) < 2 && d.stage !== 'cancelled') { d.stage = 'office'; d.negotiationStatus = 'تم الاتفاق'; moved = true; }
@@ -463,7 +502,7 @@ window.VH = window.VH || {};
   };
 
   /* =====================================================================
-     ④ مكتب الإيجار — مع لوحة السيارة وصورة العقد الإلزامية
+     ④ مكتب الإيجار — لكل سيارة مكتبها ولوحتها وإيجارها وحد الكيلومترات، وصورة العقد اختيارية
      ===================================================================== */
   /** سيارة لكل سطر من بنود العقد (النوع + بسائق/بدون) */
   O.expandCars = function (d) {
@@ -495,15 +534,15 @@ window.VH = window.VH || {};
       {
         name: '_cars', type: 'html', full: true,
         html: '<label style="font-size:.82rem;font-weight:600;color:var(--vh-navy)">بيانات كل سيارة على حدة <span class="req">*</span> ' +
-          '<span class="hint" style="font-weight:400">— ' + cars.length + ' سيارة حسب العقد، ولكل سيارة مكتبها ولوحتها وإيجارها</span></label>' +
+          '<span class="hint" style="font-weight:400">— ' + cars.length + ' سيارة حسب العقد، ولكل سيارة مكتبها ولوحتها وإيجارها وحد الكيلومترات</span></label>' +
           '<div id="rCarsBox"></div>' +
           '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">' +
-          '<button type="button" class="btn btn--sm btn--ghost" data-copy-first>نسخ المكتب والإيجار من السطر الأول للكل</button>' +
+          '<button type="button" class="btn btn--sm btn--ghost" data-copy-first>نسخ المكتب والإيجار والكيلومترات من السطر الأول للكل</button>' +
           '<button type="button" class="btn btn--sm btn--ghost" data-add-car>+ إضافة سيارة</button></div>'
       },
       {
         name: '_img', type: 'html', full: true,
-        html: '<label>صورة العقد <span class="req">*</span> <span class="hint">(إلزامية عند «تم التعاقد»)</span></label>' +
+        html: '<label>صورة العقد <span class="hint">(اختيارية)</span></label>' +
           '<input type="file" id="cImg" accept="image/*" capture="environment">' +
           '<div id="cImgBox" style="margin-top:10px">' +
           (img ? '<img src="' + img + '" alt="صورة العقد" style="max-height:150px;border-radius:10px;border:1px solid var(--vh-border)">' +
@@ -529,22 +568,30 @@ window.VH = window.VH || {};
             '<td><input class="qin" data-k="officePhone" dir="ltr" inputmode="tel" value="' + VH.esc(x.officePhone || '') + '" placeholder="05…"></td>' +
             '<td><input class="qin" data-k="plate" value="' + VH.esc(x.plate || '') + '" placeholder="أ ب ج 1234"></td>' +
             '<td><input class="qin" type="number" min="0" step="0.01" dir="ltr" data-k="rentPerDay" value="' + VH.esc(x.rentPerDay || '') + '"></td>' +
+            '<td><input class="qin" type="number" min="0" step="1" dir="ltr" data-k="kmAllowed" value="' + VH.esc(x.kmAllowed || '') + '" placeholder="مثال: 250"></td>' +
+            '<td><input class="qin" type="number" min="0" step="0.01" dir="ltr" data-k="kmExtraRate" value="' + VH.esc(x.kmExtraRate || '') + '" placeholder="مثال: 1.50"></td>' +
             '<td class="n" data-rt>—</td>' +
             '<td><button type="button" class="btn btn--sm btn--danger" data-del-car title="حذف">×</button></td></tr>';
         }
         function render() {
           bd.querySelector('#rCarsBox').innerHTML =
-            '<div class="tbl-wrap"><table class="tbl" style="min-width:900px"><thead><tr>' +
+            '<div class="tbl-wrap"><table class="tbl" style="min-width:1120px"><thead><tr>' +
             '<th>نوع السيارة</th><th style="width:110px">السائق</th><th>مكتب الإيجار</th><th style="width:130px">جوال المكتب</th>' +
-            '<th style="width:130px">لوحة السيارة</th><th style="width:120px">إيجار اليوم</th><th style="width:110px">الإجمالي (' + days + ' يوم)</th><th style="width:44px"></th>' +
+            '<th style="width:130px">لوحة السيارة</th><th style="width:120px">إيجار اليوم</th>' +
+            '<th style="width:120px">الكيلومترات المسموحة</th><th style="width:130px">سعر الكيلو الزائد</th>' +
+            '<th style="width:110px">الإجمالي (' + days + ' يوم)</th><th style="width:44px"></th>' +
             '</tr></thead><tbody>' + cars.map(rowHtml).join('') + '</tbody>' +
-            '<tfoot><tr><th colspan="6">إجمالي الإيجار لكل السيارات</th><th class="n" id="rSum" colspan="2">—</th></tr></tfoot></table></div>';
+            '<tfoot><tr><th colspan="8">إجمالي الإيجار لكل السيارات</th><th class="n" id="rSum" colspan="2">—</th></tr></tfoot></table></div>';
           recalc();
         }
         function read() {
           return [].slice.call(bd.querySelectorAll('#rCarsBox tbody tr')).map(function (tr) {
             var g = function (k) { var e = tr.querySelector('[data-k=' + k + ']'); return e ? e.value.trim() : ''; };
-            return { id: tr.getAttribute('data-id') || VH.uid('car'), carType: g('carType'), withDriver: g('withDriver'), officeName: g('officeName'), officePhone: g('officePhone'), plate: g('plate'), rentPerDay: VH.num(g('rentPerDay')) };
+            return {
+              id: tr.getAttribute('data-id') || VH.uid('car'), carType: g('carType'), withDriver: g('withDriver'),
+              officeName: g('officeName'), officePhone: g('officePhone'), plate: g('plate'),
+              rentPerDay: VH.num(g('rentPerDay')), kmAllowed: VH.num(g('kmAllowed')), kmExtraRate: VH.num(g('kmExtraRate'))
+            };
           });
         }
         function recalc() {
@@ -565,8 +612,13 @@ window.VH = window.VH || {};
           }
           if (e.target.closest('[data-copy-first]')) {
             cars = read(); var f = cars[0]; if (!f) return;
-            cars.forEach(function (x, i) { if (i) { x.officeName = f.officeName; x.officePhone = f.officePhone; x.rentPerDay = f.rentPerDay; } });
-            render(); VH.toast('نُسخت بيانات المكتب والإيجار لكل السيارات', 'ok');
+            cars.forEach(function (x, i) {
+              if (i) {
+                x.officeName = f.officeName; x.officePhone = f.officePhone; x.rentPerDay = f.rentPerDay;
+                x.kmAllowed = f.kmAllowed; x.kmExtraRate = f.kmExtraRate;
+              }
+            });
+            render(); VH.toast('نُسخت بيانات المكتب والإيجار والكيلومترات لكل السيارات', 'ok');
           }
           var del = e.target.closest('[data-del-car]');
           if (del) {
@@ -594,7 +646,6 @@ window.VH = window.VH || {};
             var contracted = v.status === 'تم التعاقد';
             if (list.some(function (x) { return !x.officeName || !(x.rentPerDay > 0); })) { VH.form.error(bd, 'أكملي لكل سيارة: اسم المكتب وإيجار اليوم'); return; }
             if (contracted && list.some(function (x) { return !x.plate; })) { VH.form.error(bd, 'أدخلي لوحة كل سيارة قبل اختيار «تم التعاقد»'); return; }
-            if (contracted && !img) { VH.form.error(bd, 'إرفاق صورة العقد إلزامي عند اختيار «تم التعاقد»'); return; }
             list.forEach(function (x) { x.rentTotal = VH.round2(x.rentPerDay * days); });
             var offices = list.map(function (x) { return x.officeName; }).filter(function (o, i, a) { return a.indexOf(o) === i; });
             d.rental = {
@@ -617,7 +668,7 @@ window.VH = window.VH || {};
             }
             var moved = false;
             if (contracted && O.idx(d.stage) < 3) { d.stage = 'assigned'; moved = true; }
-            O.push(d, moved ? 'تم التعاقد مع ' + offices.join('، ') + ' على ' + list.length + ' سيارة وأُرفقت صورة العقد' : 'تحديث بيانات مكتب الإيجار');
+            O.push(d, moved ? 'تم التعاقد مع ' + offices.join('، ') + ' على ' + list.length + ' سيارة' + (img ? ' وأُرفقت صورة العقد' : '') : 'تحديث بيانات مكتب الإيجار');
             VH.store.save('deals', d);
             VH.store.log('مكتب الإيجار', d.code + ' — ' + offices.join('، ') + ' (' + v.status + ') — ' + list.length + ' سيارة', d.id);
             close(); VH.toast(moved ? 'تم التعاقد — انتقلت المهمة لمرحلة الإسناد وانعكست السيارات على قسم بيانات السيارات' : 'حُفظ', 'ok');
@@ -936,6 +987,39 @@ window.VH = window.VH || {};
     });
   };
 
+  /** حذف نهائي للصفقة (مع خيار حذف فواتيرها) — للمدير فقط */
+  O.deleteDeal = function (d, after) {
+    if (!VH.auth.can('deleteAny')) { VH.toast('الحذف متاح للمدير فقط', 'warn'); return; }
+    var inv = VH.store.list('invoices').filter(function (i) { return i.dealId === d.id; });
+    VH.modal({
+      title: 'حذف نهائي — ' + VH.esc(d.code),
+      body: '<p style="margin-top:0">سيُحذف العميل <b>' + VH.esc(d.orgName || d.clientName) + '</b> وكل بياناته ' +
+        '(عرض السعر والعقد ومكتب الإيجار والسيارات والمصاريف والخط الزمني) <b>نهائياً ولا يمكن التراجع</b>.</p>' +
+        (inv.length
+          ? '<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin-top:10px">' +
+            '<input type="checkbox" id="delInv" checked style="margin-top:5px">' +
+            '<span>حذف الفواتير المرتبطة أيضاً (<b>' + inv.length + '</b> فاتورة بقيمة ' +
+            VH.moneyTxt(inv.reduce(function (a, i) { return a + VH.num(i.total); }, 0)) + ')<br>' +
+            '<span class="small muted">إن تركتِه فارغاً ستبقى الفواتير في البوابة المالية بلا صفقة مرتبطة.</span></span></label>'
+          : '<p class="small muted">لا توجد فواتير مرتبطة بهذه الصفقة.</p>'),
+      actions: [
+        {
+          label: 'حذف نهائي', cls: 'btn--danger', onClick: function (close, bd) {
+            var alsoInv = bd.querySelector('#delInv') && bd.querySelector('#delInv').checked;
+            var n = 0;
+            if (alsoInv) inv.forEach(function (i) { VH.store.remove('invoices', i.id); n++; });
+            else inv.forEach(function (i) { i.dealId = ''; i.dealCode = ''; VH.store.save('invoices', i); });
+            VH.store.remove('deals', d.id);
+            VH.store.log('حذف صفقة', d.code + ' — ' + (d.orgName || d.clientName) + (n ? ' مع ' + n + ' فاتورة' : ''), d.id);
+            close(); VH.toast('حُذفت الصفقة نهائياً', 'warn');
+            if (after) after(); else location.hash = '#/o/deals';
+          }
+        },
+        { label: 'تراجع', cls: 'btn--ghost' }
+      ]
+    });
+  };
+
   O.reopen = function (d, after) {
     VH.confirm('إعادة فتح الصفقة', 'ستعود الصفقة إلى المرحلة المناسبة حسب البيانات المسجّلة.', 'إعادة الفتح', function () {
       d.stage = (d.expenses || []).length ? 'expenses'
@@ -1034,8 +1118,20 @@ window.VH = window.VH || {};
     pending.forEach(function (l) {
       var seq = VH.num(VH.store.settings().dealSeq) || 1;
       var day = String(l.at || VH.stamp()).slice(0, 10);
-      var leadCars = (l.cars && l.cars.length) ? l.cars.map(function (x) { return { carType: x.carType || '', carsCount: VH.num(x.carsCount) || 1 }; })
-        : [{ carType: '', carsCount: VH.num(l.carsCount) || 1 }];
+      var leadCars = (l.cars && l.cars.length)
+        ? l.cars.map(function (x) {
+          return {
+            carType: x.carType || '', carsCount: VH.num(x.carsCount) || 1,
+            withDriver: x.withDriver || l.withDriver || 'بسائق',
+            fromCity: x.fromCity || '', toCity: x.toCity || l.city || '',
+            startDate: x.startDate || l.expectedStart || '', endDate: x.endDate || l.expectedEnd || '',
+            pricePerCarPerDay: ''
+          };
+        })
+        : [{
+          carType: '', carsCount: VH.num(l.carsCount) || 1, withDriver: l.withDriver || 'بسائق',
+          fromCity: '', toCity: l.city || '', startDate: l.expectedStart || '', endDate: l.expectedEnd || '', pricePerCarPerDay: ''
+        }];
       var d = {
         code: 'C-' + (1000 + seq),
         orgName: l.orgName, clientName: l.contactName, jobTitle: l.jobTitle || '',
@@ -1043,15 +1139,18 @@ window.VH = window.VH || {};
         contactDate: day, negotiationDate: day,
         negotiationStatus: 'بداية التواصل', owner: '', assignee: '',
         stage: 'marketing', source: 'فورم الموقع', leadRef: l.ref || '',
-        notes: 'طلب وارد من فورم الموقع — المدينة: ' + (l.city || '') +
-          ' · السيارات: ' + leadCars.map(function (x) { return (x.carType || 'غير محدد') + ' ×' + x.carsCount; }).join('، ') +
-          ' · ' + (l.withDriver || 'بسائق') +
-          ' · المشروع من ' + (l.expectedStart || '؟') + ' إلى ' + (l.expectedEnd || '؟'),
+        notes: 'طلب وارد من فورم الموقع — ' +
+          leadCars.map(function (x) {
+            return (x.carType || 'غير محدد') + ' ×' + x.carsCount + ' (' + x.withDriver + ') من ' +
+              (x.fromCity || '؟') + ' إلى ' + (x.toCity || '؟') + ' — ' + (x.startDate || '؟') + ' → ' + (x.endDate || '؟');
+          }).join(' | '),
         quote: {
-          city: l.city || '', carsCount: leadCars.reduce(function (a, x) { return a + x.carsCount; }, 0),
-          startDate: l.expectedStart || '', endDate: l.expectedEnd || '',
+          city: (leadCars[0] || {}).toCity || l.city || '',
+          carsCount: leadCars.reduce(function (a, x) { return a + x.carsCount; }, 0),
+          startDate: l.expectedStart || (leadCars[0] || {}).startDate || '',
+          endDate: l.expectedEnd || (leadCars[0] || {}).endDate || '',
           withDriver: l.withDriver || 'بسائق',
-          items: leadCars.map(function (x) { return { carType: x.carType || '', carsCount: x.carsCount, withDriver: l.withDriver || 'بسائق', pricePerCarPerDay: '' }; })
+          items: leadCars
         },
         contract: {}, rental: {}, vehicles: [], driver: {}, expenses: [], timeline: []
       };
@@ -1064,8 +1163,16 @@ window.VH = window.VH || {};
     });
     return pending.length;
   };
+  /**
+   * رابط فورم العملاء — صفحة عامة في مجلد مستقل تماماً عن مجلد النظام،
+   * فلا يستطيع أحد الوصول للنظام بتعديل رابط الفورم.
+   * يمكن تخصيصه من config.js عبر formUrl.
+   */
   O.formUrl = function () {
-    return location.href.replace(/[^/]*(\?[^#]*)?(#.*)?$/, '') + 'form.html';
+    var cfg = (window.VH_CONFIG || {}).formUrl;
+    if (cfg) return cfg;
+    var dir = (window.VH_CONFIG || {}).formPath || 'quote-request/';
+    return location.origin + '/' + dir;
   };
 
   /* =====================================================================
@@ -1102,8 +1209,9 @@ window.VH = window.VH || {};
           : '<span class="badge b-red">غير مسند</span>') + '</td>' +
         '<td class="actions">' +
         (wa ? '<a class="btn btn--sm btn--teal" target="_blank" rel="noopener" href="https://wa.me/' + wa + '">واتساب</a>' : '') +
-        '<button class="btn btn--sm btn--ghost" data-go="' + d.id + '">فتح</button></td>' +
-        '</tr>';
+        '<button class="btn btn--sm btn--ghost" data-go="' + d.id + '">فتح</button>' +
+        (VH.auth.can('deleteAny') ? '<button class="btn btn--sm btn--danger" data-del-deal="' + d.id + '" title="حذف نهائي">حذف</button>' : '') +
+        '</td></tr>';
     }).join('');
 
     var html =
@@ -1114,7 +1222,7 @@ window.VH = window.VH || {};
       '<code class="small n" id="formLink" style="background:#fff;padding:6px 12px;border-radius:8px;max-width:340px;overflow:auto;white-space:nowrap">' +
       VH.esc(O.formUrl()) + '</code>' +
       '<button class="btn btn--sm btn--ghost" data-copy-form>نسخ الرابط</button>' +
-      '<a class="btn btn--sm btn--navy" href="form.html" target="_blank" rel="noopener">فتح الفورم</a>' +
+      '<a class="btn btn--sm btn--navy" href="' + VH.esc(O.formUrl()) + '" target="_blank" rel="noopener">فتح الفورم</a>' +
       '</div>' +
 
       (unassigned.length ? '<div class="strip strip--warn"><span class="strip__ico">!</span>' +
@@ -1190,8 +1298,9 @@ window.VH = window.VH || {};
         '<td class="n">' + (t.cost ? VH.fmt(t.cost) : '—') + '</td>' +
         '<td class="n" style="color:' + (t.profit >= 0 ? 'var(--ok)' : 'var(--bad)') + '">' + (t.revenueTotal ? VH.fmt(t.profit) : '—') + '</td>' +
         '<td>' + VH.avatar(VH.store.employeeName(d.assignee || d.owner)) + ' ' + VH.esc(VH.store.employeeName(d.assignee || d.owner)) + '</td>' +
-        '<td class="actions"><button class="btn btn--sm btn--ghost" data-go="' + d.id + '">فتح</button></td>' +
-        '</tr>';
+        '<td class="actions"><button class="btn btn--sm btn--ghost" data-go="' + d.id + '">فتح</button>' +
+        (VH.auth.can('deleteAny') ? '<button class="btn btn--sm btn--danger" data-del-deal="' + d.id + '" title="حذف نهائي">حذف</button>' : '') +
+        '</td></tr>';
     }).join('');
 
     var html =
@@ -1285,7 +1394,7 @@ window.VH = window.VH || {};
       (hasQ && i < 2 && !cancelled ? '<button class="btn btn--sm btn--gold" data-accept-quote>تم الاتفاق</button>' : '');
     var c2 = card(2, 'عرض السعر', cancelled ? 'is-locked' : (i >= 2 ? 'is-done' : (hasQ ? 'is-active' : (i === 0 ? 'is-locked' : 'is-active'))),
       hasQ ? '<span class="badge b-peach">أُرسل ' + VH.dateShort(String(q.sentAt || '').slice(0, 10)) + '</span>' : '<span class="badge b-gray">لم يُصدر بعد</span>',
-      hasQ ? kv([['اسم الجهة', VH.esc(q.orgName)], ['مدينة المشروع', VH.esc(q.city)],
+      hasQ ? kv([['اسم الجهة', VH.esc(q.orgName)], ['المسار', VH.esc(q.route || q.city || '')],
       ['فترة المشروع', '<span class="num">' + VH.esc(q.startDate) + ' → ' + VH.esc(q.endDate) + '</span>'],
       ['عدد الأيام', '<span class="num">' + q.days + '</span> يوم'],
       ['عدد السيارات', '<span class="num">' + q.carsCount + '</span> (' + VH.esc(q.withDriver) + ')'],
@@ -1305,9 +1414,9 @@ window.VH = window.VH || {};
       ['بداية الخدمة', VH.dateAr(c.startDate)], ['نهاية الخدمة', VH.dateAr(c.endDate)],
       ['عدد الأيام', '<span class="num">' + c.days + '</span> يوم'],
       ['قيمة السيارة لليوم', c.items && c.items.length > 1 ? 'حسب النوع (انظري الجدول)' : VH.money(c.pricePerCarPerDay)],
-      ['السعر الإجمالي', VH.money(c.price) + (c.priceVatIncluded === 'no' ? ' <span class="small muted">+ ضريبة</span>' : ' <span class="small muted">شامل الضريبة</span>')],
-      ['الضريبة المستحقة', VH.money(t.vat)]]) +
-      (c.items && c.items.length ? '<div style="margin-top:14px">' + O.quoteItemsTable(O.calcQuote(c.items, c.days, t.rate)) + '</div>' : '')
+      ['السعر الإجمالي', VH.money(c.price) + ' <span class="small muted">شامل الضريبة</span>'],
+      ['الضريبة المحتسبة ضمنه', VH.money(t.vat)]]) +
+      (c.items && c.items.length ? '<div style="margin-top:14px">' + O.quoteItemsTable(O.calcQuote(c.items, t.rate)) + '</div>' : '')
         : '<p class="small muted" style="margin:0">تُنقل بيانات عرض السعر هنا تلقائياً عند الضغط على «تم الاتفاق».</p>',
       hasC ? '<button class="btn btn--sm btn--ghost" data-edit-contract>تعديل</button>'
         : (hasQ ? '<button class="btn btn--sm btn--ghost" data-edit-contract>إدخال يدوي</button>' : ''));
@@ -1316,21 +1425,24 @@ window.VH = window.VH || {};
     var c4 = card(4, 'التفاوض مع مكتب الإيجار', st(2),
       r.status ? '<span class="badge ' + (r.status === 'تم التعاقد' ? 'b-green' : 'b-gold') + '">' + VH.esc(r.status) + '</span>' : '',
       (r.officeName ? (r.cars && r.cars.length
-        ? '<div class="tbl-wrap"><table class="tbl" style="min-width:640px"><thead><tr><th>#</th><th>نوع السيارة</th><th>السائق</th><th>المكتب</th><th>جوال المكتب</th><th>اللوحة</th><th>إيجار اليوم</th><th>الإجمالي</th></tr></thead><tbody>' +
+        ? '<div class="tbl-wrap"><table class="tbl" style="min-width:820px"><thead><tr><th>#</th><th>نوع السيارة</th><th>السائق</th><th>المكتب</th><th>جوال المكتب</th><th>اللوحة</th><th>إيجار اليوم</th><th>الكيلومترات</th><th>الإجمالي</th></tr></thead><tbody>' +
           r.cars.map(function (x, k) {
             return '<tr><td class="n">' + (k + 1) + '</td><td>' + VH.esc(x.carType) + '</td><td><span class="badge ' + (x.withDriver === 'بدون سائق' ? 'b-gray' : 'b-lime') + '">' + VH.esc(x.withDriver || 'بسائق') + '</span></td>' +
               '<td>' + VH.esc(x.officeName) + '</td><td class="n">' + VH.esc(x.officePhone || '—') + '</td><td class="n">' + VH.esc(x.plate || '—') + '</td>' +
-              '<td class="n">' + VH.fmt(x.rentPerDay) + '</td><td class="n"><b>' + VH.fmt(x.rentTotal) + '</b></td></tr>';
+              '<td class="n">' + VH.fmt(x.rentPerDay) + '</td>' +
+              '<td class="small">' + (x.kmAllowed ? '<span class="num">' + VH.int(x.kmAllowed) + '</span> كم' +
+                (x.kmExtraRate ? '<br><span class="muted">الزائد <span class="num">' + VH.fmt(x.kmExtraRate) + '</span> ر.س/كم</span>' : '') : '—') + '</td>' +
+              '<td class="n"><b>' + VH.fmt(x.rentTotal) + '</b></td></tr>';
           }).join('') +
-          '</tbody><tfoot><tr><th colspan="7">إجمالي الإيجار لكل السيارات (' + r.cars.length + ' سيارة × ' + (c.days || 0) + ' يوم)</th><th class="n">' + VH.fmt(r.rentTotal) + ' ر.س</th></tr></tfoot></table></div>'
+          '</tbody><tfoot><tr><th colspan="8">إجمالي الإيجار لكل السيارات (' + r.cars.length + ' سيارة × ' + (c.days || 0) + ' يوم)</th><th class="n">' + VH.fmt(r.rentTotal) + ' ر.س</th></tr></tfoot></table></div>'
         : kv([['اسم المكتب', VH.esc(r.officeName)], ['جوال المكتب', '<span class="num">' + VH.esc(r.officePhone || '') + '</span>'],
         ['لوحة السيارة', '<span class="num">' + VH.esc(r.plate || '') + '</span>'],
         ['إيجار اليوم', VH.money(r.rentPerDay)], ['إجمالي الإيجار', VH.money(r.rentTotal)]])) +
         (r.contractImage ? '<div style="margin-top:14px"><small class="muted">صورة العقد</small><br>' +
           '<img src="' + r.contractImage + '" alt="صورة العقد" data-zoom style="max-height:130px;border-radius:10px;border:1px solid var(--vh-border);cursor:zoom-in;margin-top:6px"></div>'
-          : (r.status === 'تم التعاقد' ? '<p class="small" style="color:var(--bad);margin:12px 0 0">⚠ لم تُرفق صورة العقد</p>' : '')) +
+          : (r.status === 'تم التعاقد' ? '<p class="small muted" style="margin:12px 0 0">لم تُرفق صورة العقد (اختيارية)</p>' : '')) +
         (r.notes ? '<p class="small muted" style="margin:12px 0 0">📝 ' + VH.esc(r.notes) + '</p>' : '')
-        : '<p class="small muted" style="margin:0">لم يُسجَّل مكتب إيجار بعد. إرفاق صورة العقد إلزامي عند «تم التعاقد».</p>'),
+        : '<p class="small muted" style="margin:0">لم يُسجَّل مكتب إيجار بعد. لكل سيارة: المكتب واللوحة وإيجار اليوم والكيلومترات المسموحة. صورة العقد اختيارية.</p>'),
       i >= 2 ? '<button class="btn btn--sm ' + (r.officeName ? 'btn--ghost' : 'btn--gold') + '" data-edit-office>' + (r.officeName ? 'تعديل' : 'إدخال بيانات المكتب') + '</button>' : '');
 
     /* ⑤ الإسناد */
@@ -1404,10 +1516,14 @@ window.VH = window.VH || {};
     var inv = VH.store.list('invoices').filter(function (x) { return x.dealId === d.id; });
     var invCard = '<div class="card"><div class="card__h"><h2>الفواتير المرتبطة</h2><span class="sp"></span>' +
       (VH.auth.can('financeEdit') ? '<button class="btn btn--sm btn--ghost" data-add-inv>+ فاتورة لهذه الصفقة</button>' : '') + '</div>' +
-      (inv.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>البند</th><th>الإجمالي</th><th>الحالة</th></tr></thead><tbody>' +
+      (inv.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>البند</th><th>الإجمالي</th><th>الحالة</th><th></th></tr></thead><tbody>' +
         inv.map(function (x) {
           return '<tr><td class="n">' + VH.esc(x.no) + '</td><td class="n">' + VH.dateShort(x.date) + '</td><td>' + VH.dirBadge(x.direction) +
-            '</td><td>' + VH.esc(x.category || x.description) + '</td><td class="n">' + VH.fmt(x.total) + '</td><td>' + VH.payBadge(x.status) + '</td></tr>';
+            '</td><td>' + VH.esc(x.category || x.description) + '</td><td class="n">' + VH.fmt(x.total) + '</td><td>' + VH.payBadge(x.status) + '</td>' +
+            '<td class="actions">' +
+            (VH.auth.can('financeEdit') ? '<button class="btn btn--sm btn--ghost" data-edit-inv="' + x.id + '">تعديل</button>' : '') +
+            (VH.auth.can('deleteAny') ? '<button class="btn btn--sm btn--danger" data-del-inv="' + x.id + '">حذف</button>' : '') +
+            '</td></tr>';
         }).join('') + '</tbody></table></div>' : '<p class="small muted" style="margin:0">لا فواتير بعد — تُنشأ تلقائياً عند إقفال الصفقة.</p>') + '</div>';
 
     /* الخط الزمني */
@@ -1420,6 +1536,7 @@ window.VH = window.VH || {};
     if (!cancelled && !done && i >= 6) actions += '<button class="btn btn--gold" data-close-deal>إقفال الصفقة</button>';
     if (!cancelled && !done) actions += '<button class="btn btn--danger" data-cancel-deal>إلغاء الصفقة</button>';
     if (cancelled || done) actions += '<button class="btn btn--ghost" data-reopen>إعادة الفتح</button>';
+    if (VH.auth.can('deleteAny')) actions += '<button class="btn btn--danger" data-delete-deal title="حذف نهائي لو أُدخلت بالخطأ">🗑 حذف نهائي</button>';
     actions += '<a class="btn btn--ghost" href="#/o/board">رجوع</a>';
 
     var banner = cancelled ? '<div class="strip strip--warn"><span class="strip__ico">✕</span><div><b>هذه الصفقة ملغية</b><small>' + VH.esc(d.cancelReason || '') + '</small></div></div>' : '';
@@ -1446,6 +1563,20 @@ window.VH = window.VH || {};
         on('[data-close-deal]', function () { O.closeDeal(d, re); });
         on('[data-cancel-deal]', function () { O.cancelDeal(d, re); });
         on('[data-reopen]', function () { O.reopen(d, re); });
+        on('[data-delete-deal]', function () { O.deleteDeal(d); });
+        root.querySelectorAll('[data-edit-inv]').forEach(function (b) {
+          b.addEventListener('click', function () { VH.finance.invoiceModal(VH.store.get('invoices', b.getAttribute('data-edit-inv')), re); });
+        });
+        root.querySelectorAll('[data-del-inv]').forEach(function (b) {
+          b.addEventListener('click', function () {
+            var x = VH.store.get('invoices', b.getAttribute('data-del-inv'));
+            VH.confirm('حذف الفاتورة', 'ستُحذف الفاتورة ' + VH.esc(x.no) + ' (' + VH.moneyTxt(x.total) + ') نهائياً وتتغيّر الأرصدة.', 'حذف', function () {
+              VH.store.remove('invoices', x.id);
+              VH.store.log('حذف فاتورة', x.no + ' — ' + VH.moneyTxt(x.total), d.id);
+              VH.toast('حُذفت الفاتورة', 'warn'); re();
+            }, true);
+          });
+        });
         on('[data-add-inv]', function () { VH.finance.invoiceModal(null, re, d); });
         on('[data-zoom]', function () {
           VH.modal({ title: 'صورة عقد مكتب الإيجار — ' + d.code, wide: true, body: '<img src="' + r.contractImage + '" style="width:100%;border-radius:10px">' });

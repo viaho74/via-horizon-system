@@ -85,11 +85,9 @@ window.VH = window.VH || {};
         value: i.dealId || (deal ? deal.id : '')
       },
       { name: 'description', label: 'وصف البند', full: true, value: i.description },
-      { name: 'amount', label: 'المبلغ', type: 'number', required: true, value: i.amountBeforeVat !== undefined && existing ? (i.vatIncluded === false ? i.amountBeforeVat : i.total) : '' },
       {
-        name: 'mode', label: 'المبلغ المُدخل', type: 'select',
-        options: [{ v: 'inc', t: 'شامل الضريبة' }, { v: 'exc', t: 'قبل الضريبة (تُضاف عليه)' }],
-        value: existing ? (i.vatIncluded === false ? 'exc' : 'inc') : 'inc'
+        name: 'amount', label: 'المبلغ (شامل الضريبة)', type: 'number', required: true,
+        value: existing ? i.total : '', hint: 'كل المبالغ في النظام شاملة الضريبة — لا تُضاف عليها ضريبة'
       },
       {
         name: 'vatRate', label: 'نسبة الضريبة', type: 'select',
@@ -115,7 +113,7 @@ window.VH = window.VH || {};
       onOpen: function (bd) {
         function calc() {
           var v = VH.form.read(bd);
-          var r = VH.vat(v.amount, VH.num(v.vatRate), v.mode !== 'exc');
+          var r = VH.vat(v.amount, VH.num(v.vatRate), true);
           bd.querySelector('#invPrev').innerHTML =
             '<b>الإجمالي ' + VH.fmt(r.total) + ' ر.س</b>' +
             '<small> = قبل الضريبة ' + VH.fmt(r.before) + ' + ضريبة ' + VH.fmt(r.vat) + ' (' + VH.fmt(r.rate) + '%)</small>';
@@ -136,13 +134,13 @@ window.VH = window.VH || {};
           label: existing ? 'حفظ التعديل' : 'حفظ الفاتورة', cls: 'btn--gold', onClick: function (close, bd) {
             var v = VH.form.validate(bd, fields); if (!v) return;
             if (!VH.num(v.amount)) { VH.form.error(bd, 'أدخلي مبلغاً أكبر من صفر'); return; }
-            var r = VH.vat(v.amount, VH.num(v.vatRate), v.mode !== 'exc');
+            var r = VH.vat(v.amount, VH.num(v.vatRate), true);
             var d = v.dealId ? VH.store.get('deals', v.dealId) : null;
             var obj = Object.assign({}, existing || {}, {
               direction: v.direction, date: v.date, party: v.party, partyPhone: v.partyPhone,
               category: v.category, dealId: v.dealId, dealCode: d ? d.code : '',
               description: v.description, amountBeforeVat: r.before, vatRate: r.rate, vatAmount: r.vat,
-              total: r.total, vatIncluded: v.mode !== 'exc',
+              total: r.total, vatIncluded: true,
               status: v.status, paidDate: v.status === 'paid' ? (v.paidDate || VH.today()) : '',
               method: v.method
             });

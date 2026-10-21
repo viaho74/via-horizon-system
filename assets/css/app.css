@@ -60,8 +60,10 @@ a{ color: var(--vh-teal-700); text-decoration:none }
 .login__form label{ display:block; text-align:right; color:var(--vh-cream); font-size:.85rem; margin-bottom:6px }
 .login__form input{
   width:100%; padding:13px 16px; border-radius:10px; border:1.5px solid rgba(247,245,239,.25);
-  background:rgba(0,0,0,.22); color:var(--vh-cream); text-align:center; letter-spacing:.4em; font-size:1.1rem;
+  background:rgba(0,0,0,.22); color:var(--vh-cream); text-align:center; font-size:1rem;
 }
+.login__form input::placeholder{ color:rgba(247,245,239,.35); letter-spacing:normal }
+.login__form input[type=password]{ letter-spacing:.25em }
 .login__form input:focus{ outline:3px solid var(--vh-teal); outline-offset:2px }
 .login__err{ color:#FFB3A7; font-size:.85rem; min-height:1.4em; margin:8px 0 4px }
 .login__mode{ color:rgba(247,245,239,.55); font-size:.75rem; margin:16px 0 0 }

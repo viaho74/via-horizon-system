@@ -243,7 +243,7 @@ window.VH = window.VH || {};
     var rate = VH.num(q.vatRate) || VH.num(s.vatRate) || 15;
     var v = q.items && q.items.length
       ? { before: q.subtotal, vat: q.vat, total: q.grandTotal }
-      : VH.vat(q.total, rate, q.priceVatIncluded !== 'no');
+      : VH.vat(q.total, rate, true);
     var area = document.getElementById('printArea');
     var itemsTable = q.items && q.items.length
       ? O_items(q)
@@ -255,16 +255,17 @@ window.VH = window.VH || {};
         '<td class="num">' + VH.fmt(q.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(q.total) + '</td></tr>' +
         '</tbody></table>';
     function O_items(qq) {
-      return '<table><thead><tr><th>نوع السيارة</th><th>العدد</th><th>السائق</th><th>قيمة السيارة/اليوم</th>' +
-        '<th>إجمالي السيارة الواحدة</th><th>اليومي للنوع</th><th>إجمالي النوع</th></tr></thead><tbody>' +
+      return '<table><thead><tr><th>نوع السيارة</th><th>العدد</th><th>السائق</th><th>من</th><th>إلى</th>' +
+        '<th>الفترة</th><th>الأيام</th><th>قيمة اليوم</th><th>الإجمالي</th></tr></thead><tbody>' +
         qq.items.map(function (i) {
           return '<tr><td>' + VH.esc(i.carType) + '</td><td class="num">' + i.carsCount + '</td><td>' + VH.esc(i.withDriver) + '</td>' +
-            '<td class="num">' + VH.fmt(i.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(i.perCarTotal) + '</td>' +
-            '<td class="num">' + VH.fmt(i.dailyTotal) + '</td><td class="num"><b>' + VH.fmt(i.total) + '</b></td></tr>';
+            '<td>' + VH.esc(i.fromCity || '—') + '</td><td>' + VH.esc(i.toCity || '—') + '</td>' +
+            '<td class="num" style="font-size:.85em">' + VH.esc(i.startDate || '') + '<br>' + VH.esc(i.endDate || '') + '</td>' +
+            '<td class="num">' + (i.days || 0) + '</td>' +
+            '<td class="num">' + VH.fmt(i.pricePerCarPerDay) + '</td><td class="num"><b>' + VH.fmt(i.total) + '</b></td></tr>';
         }).join('') +
-        '<tr><th colspan="5" style="text-align:right">القيمة اليومية لمجموع السيارات (' + qq.carsCount + ' سيارة)</th><td class="num" colspan="2">' + VH.fmt(qq.dailyAll) + '</td></tr>' +
-        '</tbody></table>' +
-        '<p style="font-size:.85rem;color:#555;margin:10px 0 0">مدينة المشروع: ' + VH.esc(qq.city) + ' · الفترة: من ' + VH.esc(qq.startDate) + ' إلى ' + VH.esc(qq.endDate) + ' (' + qq.days + ' يوم)</p>';
+        '<tr><th colspan="8" style="text-align:right">القيمة اليومية لمجموع السيارات (' + qq.carsCount + ' سيارة)</th><td class="num">' + VH.fmt(qq.dailyAll) + '</td></tr>' +
+        '</tbody></table>';
     }
 
     area.innerHTML =
@@ -290,7 +291,7 @@ window.VH = window.VH || {};
 
         '<div class="inv__tot">' +
           '<div><span>الإجمالي قبل الضريبة (' + q.days + ' يوم)</span><span class="num">' + VH.fmt(v.before) + ' ر.س</span></div>' +
-          '<div><span>ضريبة القيمة المضافة (' + VH.fmt(rate) + '%)</span><span class="num">' + VH.fmt(v.vat) + ' ر.س</span></div>' +
+          '<div><span>ضريبة القيمة المضافة (' + VH.fmt(rate) + '%) — محتسبة ضمن المبلغ</span><span class="num">' + VH.fmt(v.vat) + ' ر.س</span></div>' +
           '<div class="g"><span>الإجمالي النهائي شامل الضريبة</span><span class="num">' + VH.fmt(v.total) + ' ر.س</span></div>' +
         '</div>' +
 
@@ -527,7 +528,7 @@ window.VH = window.VH || {};
       contactDate: VH.addDays(t, -20), negotiationDate: VH.addDays(t, -20),
       negotiationStatus: 'تم الاتفاق', owner: e1, assignee: e2,
       stage: 'done', notes: 'نقل معتمرين من المطار للفندق',
-      quote: Object.assign(VH.ops.calcQuote([{ carType: 'هيونداي H1', carsCount: 1, withDriver: 'بسائق', pricePerCarPerDay: 1200 }], 5, 15), {
+      quote: Object.assign(VH.ops.calcQuote([{ carType: 'هيونداي H1', carsCount: 1, withDriver: 'بسائق', fromCity: 'جدة', toCity: 'مكة المكرمة', startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8), pricePerCarPerDay: 1380 }], 15), {
         orgName: 'شركة الوفاء للحج والعمرة', city: 'مكة المكرمة',
         startDate: VH.addDays(t, -12), endDate: VH.addDays(t, -8),
         total: 6900, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'خليل'
@@ -554,7 +555,7 @@ window.VH = window.VH || {};
       contactDate: VH.addDays(t, -6), negotiationDate: VH.addDays(t, -6),
       negotiationStatus: 'تم الاتفاق', owner: e2, assignee: e3,
       stage: 'expenses',
-      quote: Object.assign(VH.ops.calcQuote([{ carType: 'جي إم سي', carsCount: 2, withDriver: 'بسائق', pricePerCarPerDay: 800 }], 5, 15), {
+      quote: Object.assign(VH.ops.calcQuote([{ carType: 'جي إم سي', carsCount: 2, withDriver: 'بسائق', fromCity: 'الرياض', toCity: 'الرياض', startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2), pricePerCarPerDay: 920 }], 15), {
         orgName: 'مؤسسة درب الشرق للسياحة', city: 'الرياض',
         startDate: VH.addDays(t, -2), endDate: VH.addDays(t, 2),
         total: 9200, priceVatIncluded: 'yes', sentAt: VH.stamp(), sentBy: 'محمد'
