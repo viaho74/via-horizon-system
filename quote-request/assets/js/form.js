@@ -110,7 +110,7 @@
   var RULES = {
     orgName: { req: true, msg: 'اكتب اسم الجهة' },
     contactName: { req: true, msg: 'اكتب اسم المسؤول' },
-    email: { req: true, test: function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v); }, msg: 'أدخل بريداً إلكترونياً صحيحاً (مثال: name@company.com)' },
+    email: { req: false, test: function (v) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v); }, msg: 'البريد اختياري — لكن إن كتبته فاكتبه صحيحاً (مثال: name@company.com)' },
     phone: { req: true, test: function (v) { return /^(?:\+?966|0)?5\d{8}$/.test(v.replace(/[\s-]/g, '')); }, msg: 'أدخل رقم جوال سعودي صحيح (مثال: 0512345678)' }
   };
 

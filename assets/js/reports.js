@@ -15,11 +15,12 @@ window.VH = window.VH || {};
     var inv = VH.store.list('invoices');
     var months = {};
     inv.forEach(function (i) {
-      var k = VH.monthKey(i.status === 'paid' ? (i.paidDate || i.date) : i.date);
+      var paid = VH.finance.paidOf(i);
+      var k = VH.monthKey(paid ? (i.paidDate || i.date) : i.date);
       if (!k) return;
       months[k] = months[k] || { k: k, in: 0, out: 0, vin: 0, vout: 0, nIn: 0, nOut: 0 };
-      if (i.direction === 'in') { months[k].vin += VH.num(i.vatAmount); months[k].nIn++; if (i.status === 'paid') months[k].in += VH.num(i.total); }
-      else { months[k].vout += VH.num(i.vatAmount); months[k].nOut++; if (i.status === 'paid') months[k].out += VH.num(i.total); }
+      if (i.direction === 'in') { months[k].vin += VH.num(i.vatAmount); months[k].nIn++; months[k].in += paid; }
+      else { months[k].vout += VH.num(i.vatAmount); months[k].nOut++; months[k].out += paid; }
     });
     var list = Object.keys(months).sort().reverse().map(function (k) { return months[k]; });
     var max = Math.max.apply(null, [1].concat(list.map(function (m) { return Math.max(m.in, m.out); })));
@@ -77,11 +78,11 @@ window.VH = window.VH || {};
       '</div>' +
 
       '<div class="card"><div class="card__h"><h2>ربحية الصفقات</h2></div>' +
-      (deals.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الصفقة</th><th>العميل</th><th>الإيراد قبل الضريبة</th>' +
+      (deals.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الصفقة</th><th>العميل</th><th>الإيراد (شامل الضريبة)</th>' +
         '<th>الإيجار</th><th>المصاريف</th><th>الربح</th><th>الهامش</th><th>المسؤول</th></tr></thead><tbody>' +
         deals.map(function (x) {
           return '<tr><td><a class="n" href="#/o/deal/' + x.d.id + '">' + VH.esc(x.d.code) + '</a></td>' +
-            '<td>' + VH.esc(x.d.clientName) + '</td><td class="n">' + VH.fmt(x.t.revenueBefore) + '</td>' +
+            '<td>' + VH.esc(x.d.clientName) + '</td><td class="n">' + VH.fmt(x.t.revenueTotal) + '</td>' +
             '<td class="n">' + VH.fmt(x.t.rent) + '</td><td class="n">' + VH.fmt(x.t.expenses) + '</td>' +
             '<td class="n"><b style="color:' + (x.t.profit >= 0 ? 'var(--ok)' : 'var(--bad)') + '">' + VH.fmt(x.t.profit) + '</b></td>' +
             '<td class="n">' + VH.fmt(x.t.margin) + '%</td><td>' + VH.esc(VH.store.employeeName(x.d.assignee || x.d.owner)) + '</td></tr>';
@@ -169,6 +170,18 @@ window.VH = window.VH || {};
   };
 
   /* =====================================================================
+     كليشة فيا هورايزن الرسمية — تُستخدم خلف كل مستند مطبوع
+     (الترويسة والتذييل من ملف assets/img/letterhead.jpg، ونكتب فوقها
+      قيمتَي «التاريخ» و«الموضوع» في مكانيهما المنقّطين)
+     ===================================================================== */
+  R.letterhead = function (date, subject) {
+    return '<div class="sheet-bg" aria-hidden="true">' +
+      '<b class="s-date">' + VH.esc(date || VH.today()) + '</b>' +
+      '<b class="s-subj">' + VH.esc(subject || '') + '</b>' +
+      '</div>';
+  };
+
+  /* =====================================================================
      طباعة فاتورة ضريبية مبسّطة
      ===================================================================== */
   R.printInvoice = function (inv) {
@@ -178,19 +191,15 @@ window.VH = window.VH || {};
     var d = inv.dealId ? VH.store.get('deals', inv.dealId) : null;
     var when = (inv.date || VH.today()) + 'T12:00:00Z';
 
+    var ttl = inv.direction === 'in' ? 'فاتورة ضريبية مبسّطة' : 'سند صرف';
     area.innerHTML =
-      '<div class="inv">' +
-        '<div class="inv__top"><img src="assets/img/logo-color.png" alt="">' +
-          '<div style="flex:1"><h2>' + VH.esc(c.name || 'شركة فيا هورايزن') + '</h2>' +
-          '<div style="font-size:.82rem;color:#666">' + VH.esc(c.slogan || '') + '</div>' +
-          (c.taxNumber ? '<div style="font-size:.82rem">الرقم الضريبي: <span class="num">' + VH.esc(c.taxNumber) + '</span></div>' : '') +
-          (c.crNumber ? '<div style="font-size:.82rem">السجل التجاري: <span class="num">' + VH.esc(c.crNumber) + '</span></div>' : '') +
-          (c.phone ? '<div style="font-size:.82rem">هاتف: <span class="num">' + VH.esc(c.phone) + '</span></div>' : '') +
-          '</div>' +
-          '<div style="text-align:left"><b style="font-size:1.05rem">' + (inv.direction === 'in' ? 'فاتورة ضريبية مبسّطة' : 'سند صرف') + '</b>' +
-          '<div style="font-size:.85rem">رقم: <span class="num">' + VH.esc(inv.no) + '</span></div>' +
-          '<div style="font-size:.85rem">التاريخ: <span class="num">' + VH.esc(inv.date) + '</span></div></div>' +
-        '</div>' +
+      R.letterhead(inv.date, ttl + ' رقم ' + inv.no) +
+      '<div class="sheet"><div class="inv">' +
+        '<div class="inv__ttl"><h2>' + ttl + '</h2>' +
+          '<div class="meta">رقم: <span class="num">' + VH.esc(inv.no) + '</span>' +
+          (c.taxNumber ? '<br>الرقم الضريبي: <span class="num">' + VH.esc(c.taxNumber) + '</span>' : '') +
+          (c.crNumber ? '<br>السجل التجاري: <span class="num">' + VH.esc(c.crNumber) + '</span>' : '') +
+          '</div></div>' +
 
         '<h4>بيانات ' + (inv.direction === 'in' ? 'العميل' : 'المورّد') + '</h4>' +
         '<table><tr><th style="width:32%">الاسم</th><td>' + VH.esc(inv.party) + '</td></tr>' +
@@ -210,13 +219,15 @@ window.VH = window.VH || {};
           '<div><span>الإجمالي قبل الضريبة</span><span class="num">' + VH.fmt(inv.amountBeforeVat) + ' ر.س</span></div>' +
           '<div><span>ضريبة القيمة المضافة (' + VH.fmt(inv.vatRate) + '%)</span><span class="num">' + VH.fmt(inv.vatAmount) + ' ر.س</span></div>' +
           '<div class="g"><span>الإجمالي المستحق</span><span class="num">' + VH.fmt(inv.total) + ' ر.س</span></div>' +
-          '<div><span>الحالة</span><span>' + (inv.status === 'paid' ? 'مسدّدة ' + (inv.paidDate || '') : 'غير مسدّدة') + '</span></div>' +
+          '<div><span>الحالة</span><span>' + VH.payText(VH.finance.statusOf(inv)) +
+          (VH.finance.statusOf(inv) === 'partial' ? ' — مسدَّد ' + VH.fmt(VH.finance.paidOf(inv)) + ' ومتبقٍ ' + VH.fmt(VH.finance.dueOf(inv)) : '') +
+          (inv.paidDate ? ' · ' + inv.paidDate : '') + '</span></div>' +
         '</div>' +
 
         '<div class="inv__qr"><div id="qrBox"></div>' +
         '<div>رمز الاستجابة السريعة يحتوي بيانات الفاتورة بصيغة هيئة الزكاة والضريبة والجمارك (TLV).<br>' +
         'أصدرها: ' + VH.esc(inv.createdBy || '') + ' · طُبعت في ' + VH.esc(VH.today()) + '</div></div>' +
-      '</div>';
+      '</div></div>';
 
     var payload = VH.zatcaTlv(c.name || 'شركة فيا هورايزن', c.taxNumber || '', when, inv.total, inv.vatAmount);
     function go() {
@@ -246,7 +257,7 @@ window.VH = window.VH || {};
       : VH.vat(q.total, rate, true);
     var area = document.getElementById('printArea');
     var itemsTable = q.items && q.items.length
-      ? O_items(q)
+      ? O_items(VH.ops.calcQuote(q.items, rate))
       : '<table><thead><tr><th>البيان</th><th style="width:14%">العدد</th><th style="width:14%">الأيام</th>' +
         '<th style="width:18%">قيمة اليوم</th><th style="width:20%">الإجمالي</th></tr></thead><tbody>' +
         '<tr><td>' + VH.esc(q.carType) + ' — ' + VH.esc(q.withDriver) + ' — ' + VH.esc(q.city) + '<br>' +
@@ -254,31 +265,31 @@ window.VH = window.VH || {};
         '<td class="num">' + q.carsCount + '</td><td class="num">' + q.days + '</td>' +
         '<td class="num">' + VH.fmt(q.pricePerCarPerDay) + '</td><td class="num">' + VH.fmt(q.total) + '</td></tr>' +
         '</tbody></table>';
+    /** جدول البنود في عرض السعر المطبوع — البند · الوصف · الكمية · السعر · الإجمالي */
     function O_items(qq) {
-      return '<table><thead><tr><th>نوع السيارة</th><th>العدد</th><th>السائق</th><th>من</th><th>إلى</th>' +
-        '<th>الفترة</th><th>الأيام</th><th>قيمة اليوم</th><th>الإجمالي</th></tr></thead><tbody>' +
+      return '<table><thead><tr><th style="width:22%">البند</th><th>الوصف</th>' +
+        '<th style="width:12%">الكمية</th><th style="width:16%">السعر</th><th style="width:18%">الإجمالي</th></tr></thead><tbody>' +
         qq.items.map(function (i) {
-          return '<tr><td>' + VH.esc(i.carType) + '</td><td class="num">' + i.carsCount + '</td><td>' + VH.esc(i.withDriver) + '</td>' +
-            '<td>' + VH.esc(i.fromCity || '—') + '</td><td>' + VH.esc(i.toCity || '—') + '</td>' +
-            '<td class="num" style="font-size:.85em">' + VH.esc(i.startDate || '') + '<br>' + VH.esc(i.endDate || '') + '</td>' +
-            '<td class="num">' + (i.days || 0) + '</td>' +
-            '<td class="num">' + VH.fmt(i.pricePerCarPerDay) + '</td><td class="num"><b>' + VH.fmt(i.total) + '</b></td></tr>';
+          return '<tr><td><b>' + VH.esc(i.name || i.carType || '') + '</b></td>' +
+            '<td>' + VH.esc(i.desc || '') +
+            (i.isCar && (i.startDate || i.endDate)
+              ? '<br><span style="font-size:.8em;color:#666" class="num">' + VH.esc(i.startDate || '') + ' → ' + VH.esc(i.endDate || '') +
+                (i.days ? ' (' + i.days + ' يوم)' : '') + '</span>' : '') + '</td>' +
+            '<td class="num">' + VH.esc(i.qtyLabel || VH.fmtQty(i.qty)) + '</td>' +
+            '<td class="num">' + VH.fmt(i.unit) + ' ريال</td>' +
+            '<td class="num"><b>' + VH.fmt(i.total) + ' ريال</b></td></tr>';
         }).join('') +
-        '<tr><th colspan="8" style="text-align:right">القيمة اليومية لمجموع السيارات (' + qq.carsCount + ' سيارة)</th><td class="num">' + VH.fmt(qq.dailyAll) + '</td></tr>' +
         '</tbody></table>';
     }
 
+    var qDate = String(q.sentAt || VH.stamp()).slice(0, 10);
     area.innerHTML =
-      '<div class="inv">' +
-        '<div class="inv__top"><img src="assets/img/logo-color.png" alt="">' +
-          '<div style="flex:1"><h2>' + VH.esc(c.name || 'شركة فيا هورايزن') + '</h2>' +
-          '<div style="font-size:.82rem;color:#666">' + VH.esc(c.slogan || '') + '</div>' +
-          (c.taxNumber ? '<div style="font-size:.82rem">الرقم الضريبي: <span class="num">' + VH.esc(c.taxNumber) + '</span></div>' : '') +
-          (c.phone ? '<div style="font-size:.82rem">هاتف: <span class="num">' + VH.esc(c.phone) + '</span></div>' : '') + '</div>' +
-          '<div style="text-align:left"><b style="font-size:1.05rem">عرض سعر</b>' +
-          '<div style="font-size:.85rem">مرجع: <span class="num">' + VH.esc(d.code) + '</span></div>' +
-          '<div style="font-size:.85rem">التاريخ: <span class="num">' + VH.esc(String(q.sentAt || VH.stamp()).slice(0, 10)) + '</span></div></div>' +
-        '</div>' +
+      R.letterhead(qDate, 'عرض سعر — ' + (q.orgName || d.orgName || '')) +
+      '<div class="sheet"><div class="inv">' +
+        '<div class="inv__ttl"><h2>عرض سعر</h2>' +
+          '<div class="meta">مرجع: <span class="num">' + VH.esc(d.code) + '</span>' +
+          (c.taxNumber ? '<br>الرقم الضريبي: <span class="num">' + VH.esc(c.taxNumber) + '</span>' : '') +
+          '</div></div>' +
 
         '<h4>بيانات الجهة</h4>' +
         '<table><tr><th style="width:32%">اسم الجهة</th><td>' + VH.esc(q.orgName || d.orgName) + '</td></tr>' +
@@ -295,10 +306,14 @@ window.VH = window.VH || {};
           '<div class="g"><span>الإجمالي النهائي شامل الضريبة</span><span class="num">' + VH.fmt(v.total) + ' ر.س</span></div>' +
         '</div>' +
 
-        (q.notes ? '<h4>ملاحظات</h4><p style="font-size:.88rem">' + VH.esc(q.notes) + '</p>' : '') +
+        (VH.ops.kmText(q.km) || q.notes
+          ? '<h4>الشروط والملاحظات</h4><ul style="font-size:.88rem;margin:0;padding-inline-start:20px">' +
+            (VH.ops.kmText(q.km) ? '<li>' + VH.esc(VH.ops.kmText(q.km)) + '</li>' : '') +
+            (q.notes ? '<li>' + VH.esc(q.notes) + '</li>' : '') +
+            '</ul>' : '') +
         '<p style="font-size:.8rem;color:#666;margin-top:22px">هذا العرض ساري لمدة 14 يوماً من تاريخه. ' +
         'أعدّه: ' + VH.esc(q.sentBy || '') + '</p>' +
-      '</div>';
+      '</div></div>';
     setTimeout(function () { window.print(); }, 250);
   };
 

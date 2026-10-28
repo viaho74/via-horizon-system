@@ -170,11 +170,16 @@ window.VH = window.VH || {};
     return '<span class="badge ' + (map[st] || 'b-gray') + '">' + VH.esc(st || 'بداية التواصل') + '</span>';
   };
   VH.negBadge = VH.statusBadge; // توافق مع الاسم القديم
-  VH.payBadge = function (st) {
-    return st === 'paid'
-      ? '<span class="badge b-green">مدفوعة</span>'
-      : '<span class="badge b-gold">معلّقة</span>';
+  VH.PAY_STATUS = {
+    paid: { t: 'مسدد بالكامل', c: 'b-green' },
+    partial: { t: 'سداد جزئي', c: 'b-gold' },
+    unpaid: { t: 'لم يتم السداد', c: 'b-red' }
   };
+  VH.payBadge = function (st) {
+    var x = VH.PAY_STATUS[st] || VH.PAY_STATUS.unpaid;
+    return '<span class="badge ' + x.c + '">' + x.t + '</span>';
+  };
+  VH.payText = function (st) { return (VH.PAY_STATUS[st] || VH.PAY_STATUS.unpaid).t; };
   VH.dirBadge = function (d) {
     return d === 'in'
       ? '<span class="badge b-green">وارد</span>'

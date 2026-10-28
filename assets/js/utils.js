@@ -14,6 +14,8 @@ window.VH = window.VH || {};
   U.num = function (n) { var v = parseFloat(n); return isNaN(v) ? 0 : v; };
   U.fmt = function (n) { return nf2.format(U.num(n)); };
   U.int = function (n) { return nf0.format(U.num(n)); };
+  /** كمية: بلا كسور إن كانت صحيحة (2 لا 2.00) */
+  U.fmtQty = function (n) { var v = U.num(n); return v % 1 === 0 ? nf0.format(v) : nf2.format(v); };
   U.money = function (n) { return '<span class="num">' + U.fmt(n) + '</span> ر.س'; };
   U.moneyTxt = function (n) { return U.fmt(n) + ' ر.س'; };
 

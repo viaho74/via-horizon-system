@@ -342,15 +342,47 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
 .toast.ok{ background:var(--ok) } .toast.bad{ background:var(--bad) } .toast.warn{ background:var(--warn); color:#fff }
 @keyframes tin{ from{ opacity:0; transform:translateY(10px) } }
 
-/* ===================== الطباعة ===================== */
+/* ===================== الطباعة — على كليشة فيا هورايزن الرسمية ===================== */
 .print-area{ display:none }
+
+/* ورقة الكليشة: صورة الترويسة تُرسم خلف كل صفحة مطبوعة */
+.sheet-bg{
+  position:fixed; inset-block-start:0; inset-inline-start:0; width:210mm; height:297mm;
+  background:url(../img/letterhead.jpg) no-repeat 0 0 / 210mm 297mm; z-index:0;
+  -webkit-print-color-adjust:exact; print-color-adjust:exact;
+}
+/* قيمتا «التاريخ» و«الموضوع» تُكتبان فوق السطرين المنقّطين في الكليشة */
+.sheet-bg b{
+  position:absolute; left:3%; width:27%; text-align:right; direction:rtl;
+  font-family:var(--vh-font-ar); font-size:10pt; font-weight:600; color:#082B49;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.sheet-bg .s-date{ top:10% }
+.sheet-bg .s-subj{ top:12.2% }
+
 @media print{
   body{ background:#fff }
   .app,.login,.toasts,.modal-bd{ display:none !important }
   .print-area{ display:block !important; padding:0 }
-  @page{ margin:14mm }
+  /* الهوامش تحجز مكان الترويسة والتذييل في كل صفحة */
+  @page{ margin:50mm 18mm 36mm }
+  /* إزاحة الخلفية بمقدار الهوامش لتغطّي الورقة كاملة، وتتكرّر مع كل صفحة */
+  .sheet-bg{ inset-block-start:-50mm; inset-inline-start:-18mm }
+  .inv{ max-width:none }
+  .inv table{ page-break-inside:auto }
+  .inv tr{ page-break-inside:avoid }
+  .inv h4{ page-break-after:avoid }
 }
-.inv{ font-family:var(--vh-font-ar); color:#082B49; max-width:800px; margin:0 auto }
+/* المعاينة على الشاشة (حين تُعرض منطقة الطباعة): نحاكي الورقة كاملة */
+@media screen{
+  .print-area{ position:relative; width:210mm; margin:0 auto; box-shadow:0 10px 30px rgba(5,29,51,.18) }
+  .print-area .sheet-bg{ position:absolute }
+  .print-area .sheet{ position:relative; z-index:1; padding:50mm 18mm 36mm; min-height:297mm }
+}
+.inv{ position:relative; z-index:1; font-family:var(--vh-font-ar); color:#082B49; margin:0 auto }
+.inv__ttl{ display:flex; align-items:flex-end; gap:14px; border-bottom:2px solid #D6AD55; padding-bottom:10px; margin-bottom:16px }
+.inv__ttl h2{ margin:0; font-size:1.25rem; color:#082B49 }
+.inv__ttl .meta{ margin-inline-start:auto; text-align:start; font-size:.82rem; line-height:1.7 }
 .inv__top{ display:flex; align-items:flex-start; gap:20px; border-bottom:3px solid #D6AD55; padding-bottom:14px; margin-bottom:18px }
 .inv__top img{ width:150px }
 .inv__top h2{ margin:0; font-size:1.3rem }

@@ -104,7 +104,9 @@ window.VH = window.VH || {};
     var openDeals = VH.store.list('deals').filter(function (d) {
       return d.stage !== 'done' && d.stage !== 'cancelled' && d.stage !== 'marketing';
     }).length;
-    var unpaid = VH.store.list('invoices').filter(function (i) { return i.status !== 'paid' && i.direction === 'in'; }).length;
+    var unpaid = VH.store.list('invoices').filter(function (i) {
+      return i.direction === 'in' && VH.finance.dueOf(i) > 0.009;
+    }).length;
     var newLeads = VH.store.list('deals').filter(function (d) { return !d.owner && d.stage !== 'cancelled'; }).length;
     document.getElementById('nav').innerHTML = NAV[portal].map(function (n) {
       var c = n.r === 'o/board' && openDeals ? openDeals
@@ -145,6 +147,7 @@ window.VH = window.VH || {};
     all('[data-export-exp]', function () { VH.ops.exportExpenses(); });
     all('[data-export-mk]', function () { VH.ops.exportMarketing(); });
     all('[data-new-inv]', function () { VH.finance.invoiceModal(null, A.render); });
+    all('[data-batch-inv]', function () { VH.finance.batchModal(A.render); });
     all('[data-export-inv]', function () { VH.finance.exportInvoices(); });
     all('[data-export-pay]', function () { VH.finance.exportPayments(); });
     all('[data-opening]', function () { VH.finance.openingModal(A.render); });

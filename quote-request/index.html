@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=Poppins:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/css/tokens.css?v=12">
+<link rel="stylesheet" href="assets/css/tokens.css?v=13">
 <style>
 *,*::before,*::after{ box-sizing:border-box }
 html,body{ margin:0; padding:0 }
@@ -48,6 +48,7 @@ img{ max-width:100%; display:block }
 .f--full{ grid-column:1/-1 }
 .f label{ font-size:.88rem; font-weight:600; color:var(--vh-navy) }
 .f label i{ color:#C0392B; font-style:normal }
+.f label .opt{ font-weight:400; color:var(--vh-text-soft); font-size:.8rem }
 .f input,.f select{
   padding:13px 15px; border:1.5px solid var(--vh-border); border-radius:10px;
   font-family:inherit; font-size:.95rem; background:#fff; color:inherit; width:100%;
@@ -159,8 +160,8 @@ img{ max-width:100%; display:block }
         </div>
 
         <div class="f">
-          <label for="email">البريد الإلكتروني <i>*</i></label>
-          <input id="email" name="email" type="email" class="ltr" maxlength="120" autocomplete="email" inputmode="email" required>
+          <label for="email">البريد الإلكتروني <span class="opt">(اختياري)</span></label>
+          <input id="email" name="email" type="email" class="ltr" maxlength="120" autocomplete="email" inputmode="email">
           <span class="msg" data-msg="email"></span>
         </div>
 
@@ -199,7 +200,7 @@ img{ max-width:100%; display:block }
 
 <p class="foot">© شركة فيا هورايزن · <a href="https://viahorizon.sa" target="_blank" rel="noopener">viahorizon.sa</a></p>
 
-<script src="assets/js/config.js?v=12"></script>
-<script src="assets/js/form.js?v=12"></script>
+<script src="assets/js/config.js?v=13"></script>
+<script src="assets/js/form.js?v=13"></script>
 </body>
 </html>
