@@ -176,7 +176,12 @@ window.VH = window.VH || {};
 
     // شجرة الحسابات تُزرع أول تشغيل، ثم تُرحَّل قيود ما سبق من فواتير
     try {
-      if (VH.acc.seed() && VH.auth.can('finance')) {
+      var dn = VH.store.denied || {};
+      if (dn.accounts || dn.journal) {
+        if (VH.auth.can('finance')) {
+          VH.toast('النظام المحاسبي بانتظار تحديث قواعد أمان Firestore لمجموعتَي accounts و journal', 'warn', 9000);
+        }
+      } else if (VH.acc.seed() && VH.auth.can('finance')) {
         var k = VH.acc.rebuild();
         if (k) VH.toast('جُهّزت شجرة الحسابات ورُحّلت ' + k + ' حركة سابقة', 'ok', 6000);
       }

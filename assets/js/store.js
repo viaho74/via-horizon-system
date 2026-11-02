@@ -116,7 +116,13 @@ window.VH = window.VH || {};
           S.data[c] = map;
           if (first) { first = false; tick(); }
           emit();
-        }, function (err) { console.error('خطأ مزامنة ' + c, err); if (first) { first = false; tick(); } }));
+        }, function (err) {
+          // مجموعة لا تسمح بها القواعد بعد: نكمل بلا مزامنتها بدل تعليق النظام
+          console.error('خطأ مزامنة ' + c, err);
+          S.denied = S.denied || {};
+          if (err && err.code === 'permission-denied') S.denied[c] = true;
+          if (first) { first = false; tick(); }
+        }));
       });
       var firstS = true;
       S._unsub.push(db.collection('settings').doc('app').onSnapshot(function (doc) {
@@ -169,6 +175,24 @@ window.VH = window.VH || {};
   };
 
   /* ---------------- الكتابة ---------------- */
+  /**
+   * تنبيه واحد لكل نوع خطأ خلال 10 ثوانٍ — حتى لا تنهمر التنبيهات
+   * حين تفشل دفعة كاملة (مثل مجموعة لم تُضف بعد في قواعد الأمان).
+   */
+  var lastErr = {};
+  function saveError(col, e) {
+    console.error('فشل الحفظ السحابي في ' + col, e);
+    var denied = e && (e.code === 'permission-denied' || /permission/i.test(e.message || ''));
+    var key = col + ':' + (denied ? 'denied' : 'other');
+    var now = Date.now();
+    if (lastErr[key] && now - lastErr[key] < 10000) return;
+    lastErr[key] = now;
+    if (!VH.toast) return;
+    VH.toast(denied
+      ? 'لا توجد صلاحية للكتابة في «' + col + '» — حدّثي قواعد أمان Firestore'
+      : 'تعذّر الحفظ في السحابة — تحقّقي من الاتصال', 'bad', 7000);
+  }
+
   S.save = function (col, obj) {
     var isNew = !obj.id;
     obj.id = obj.id || VH.uid(col.slice(0, 3));
@@ -177,7 +201,7 @@ window.VH = window.VH || {};
     S.data[col][obj.id] = obj;
     if (S.mode === 'cloud' && S._fb) {
       S._fb.db.collection(col).doc(obj.id).set(JSON.parse(JSON.stringify(obj)))
-        .catch(function (e) { console.error('فشل الحفظ السحابي', e); VH.toast && VH.toast('تعذّر الحفظ في السحابة — تحقّقي من الاتصال', 'bad'); });
+        .catch(function (e) { saveError(col, e); });
     } else { localWrite(); }
     emit();
     return obj;
