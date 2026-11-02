@@ -13,6 +13,9 @@ window.VH = window.VH || {};
       { r: 'f/dashboard', t: 'لوحة المالية', i: '▣' },
       { r: 'f/invoices', t: 'الفواتير والحسابات', i: '🧾' },
       { r: 'f/payments', t: 'متابعة العملاء والسداد', i: '👥' },
+      { r: 'f/accounts', t: 'شجرة الحسابات', i: '🌳' },
+      { r: 'f/journal', t: 'دفتر اليومية', i: '📒' },
+      { r: 'f/trial', t: 'ميزان المراجعة', i: '⚖' },
       { r: 'f/monthly', t: 'التقرير الشهري', i: '📈' },
       { r: 'f/tax', t: 'التقرير الضريبي', i: '📄' },
       { r: 'f/settings', t: 'الإعدادات والنسخ', i: '⚙' }
@@ -70,6 +73,10 @@ window.VH = window.VH || {};
     if (p[0] === 'f') {
       if (p[1] === 'invoices') return VH.finance.invoices();
       if (p[1] === 'payments') return VH.finance.payments();
+      if (p[1] === 'accounts') return VH.acc.treePage();
+      if (p[1] === 'journal') return VH.acc.journalPage();
+      if (p[1] === 'trial') return VH.acc.trialPage();
+      if (p[1] === 'ledger' && p[2]) return VH.acc.ledgerPage(decodeURIComponent(p[2]));
       if (p[1] === 'monthly') return VH.reports.monthly();
       if (p[1] === 'tax') return VH.reports.tax();
       if (p[1] === 'settings') return VH.reports.settings();
@@ -166,6 +173,14 @@ window.VH = window.VH || {};
       var n = VH.store.migrate();
       if (n) console.info('رُحّلت ' + n + ' صفقة إلى المراحل الجديدة');
     } catch (e) { console.error('تعذّر الترحيل', e); }
+
+    // شجرة الحسابات تُزرع أول تشغيل، ثم تُرحَّل قيود ما سبق من فواتير
+    try {
+      if (VH.acc.seed() && VH.auth.can('finance')) {
+        var k = VH.acc.rebuild();
+        if (k) VH.toast('جُهّزت شجرة الحسابات ورُحّلت ' + k + ' حركة سابقة', 'ok', 6000);
+      }
+    } catch (e) { console.error('تعذّر تجهيز شجرة الحسابات', e); }
 
     document.querySelectorAll('#portalSwitch .portal__btn').forEach(function (b) {
       b.addEventListener('click', function () {

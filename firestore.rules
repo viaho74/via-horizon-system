@@ -59,6 +59,16 @@ service cloud.firestore {
       allow read, write: if signedIn();
     }
 
+    // شجرة الحسابات
+    match /accounts/{accountId} {
+      allow read, write: if signedIn();
+    }
+
+    // دفتر اليومية — القيود المحاسبية
+    match /journal/{entryId} {
+      allow read, write: if signedIn();
+    }
+
     // سجل الأحداث — يُكتب ولا يُعدّل ولا يُحذف
     match /audit/{logId} {
       allow read, create: if signedIn();

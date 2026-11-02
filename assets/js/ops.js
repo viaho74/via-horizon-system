@@ -1069,12 +1069,14 @@ window.VH = window.VH || {};
             var v = VH.form.validate(bd, fields); if (!v) return;
             if (!VH.num(v.amount)) { VH.form.error(bd, 'أدخلي مبلغاً أكبر من صفر'); return; }
             d.custody = d.custody || [];
-            d.custody.push({
+            var row = {
               id: VH.uid('cus'), driverName: v.driverName, amount: VH.num(v.amount), date: v.date,
               method: v.method, notes: v.notes, by: (VH.auth.user() || {}).name, at: VH.stamp()
-            });
+            };
+            d.custody.push(row);
             O.push(d, 'حُوّلت عهدة ' + VH.moneyTxt(v.amount) + ' للسائق ' + v.driverName);
             VH.store.save('deals', d);
+            try { VH.acc.postCustody(d, row); } catch (ex) { console.error('تعذّر ترحيل قيد العهدة', ex); }
             VH.store.log('عهدة سائق', d.code + ' — ' + v.driverName + ' ' + VH.moneyTxt(v.amount), d.id);
             close(); VH.toast('سُجّلت العهدة', 'ok');
             if (after) after();
@@ -1113,12 +1115,12 @@ window.VH = window.VH || {};
     // حالة السداد: كامل أو جزئي أو لم يُسدَّد — تُستخدم خصوصاً مع أجرة السائق
     var st = e.payStatus || 'paid';
     VH.finance.applyPaid(obj, st === 'paid' ? r.total : (st === 'unpaid' ? 0 : VH.num(e.paidAmount)));
-    VH.store.save('invoices', obj);
+    VH.finance.saveInvoice(obj);
     return obj;
   };
   O.dropExpenseInvoice = function (expId) {
     VH.store.list('invoices').filter(function (x) { return x.expenseId === expId; })
-      .forEach(function (x) { VH.store.remove('invoices', x.id); });
+      .forEach(function (x) { VH.finance.removeInvoice(x.id); });
   };
 
   O.expenseModal = function (d, after, presetKind) {
@@ -1299,8 +1301,9 @@ window.VH = window.VH || {};
           label: 'حذف نهائي', cls: 'btn--danger', onClick: function (close, bd) {
             var alsoInv = bd.querySelector('#delInv') && bd.querySelector('#delInv').checked;
             var n = 0;
-            if (alsoInv) inv.forEach(function (i) { VH.store.remove('invoices', i.id); n++; });
-            else inv.forEach(function (i) { i.dealId = ''; i.dealCode = ''; VH.store.save('invoices', i); });
+            if (alsoInv) inv.forEach(function (i) { VH.finance.removeInvoice(i.id); n++; });
+            else inv.forEach(function (i) { i.dealId = ''; i.dealCode = ''; VH.finance.saveInvoice(i); });
+            (d.custody || []).forEach(function (cx) { VH.acc.unpost('custody', cx.id); });
             VH.store.remove('deals', d.id);
             VH.store.log('حذف صفقة', d.code + ' — ' + (d.orgName || d.clientName) + (n ? ' مع ' + n + ' فاتورة' : ''), d.id);
             close(); VH.toast('حُذفت الصفقة نهائياً', 'warn');
@@ -1984,8 +1987,9 @@ window.VH = window.VH || {};
         root.querySelectorAll('[data-del-cus]').forEach(function (b) {
           b.addEventListener('click', function () {
             var cid = b.getAttribute('data-del-cus');
-            VH.confirm('حذف عهدة', 'سيُحذف سجل العهدة من الصفقة.', 'حذف', function () {
+            VH.confirm('حذف عهدة', 'سيُحذف سجل العهدة من الصفقة وقيده المحاسبي.', 'حذف', function () {
               d.custody = (d.custody || []).filter(function (x) { return x.id !== cid; });
+              VH.acc.unpost('custody', cid);
               O.push(d, 'حُذف سجل عهدة');
               VH.store.save('deals', d); VH.toast('حُذفت العهدة', 'ok'); re();
             }, true);
@@ -2001,8 +2005,8 @@ window.VH = window.VH || {};
         root.querySelectorAll('[data-del-inv]').forEach(function (b) {
           b.addEventListener('click', function () {
             var x = VH.store.get('invoices', b.getAttribute('data-del-inv'));
-            VH.confirm('حذف الفاتورة', 'ستُحذف الفاتورة ' + VH.esc(x.no) + ' (' + VH.moneyTxt(x.total) + ') نهائياً وتتغيّر الأرصدة.', 'حذف', function () {
-              VH.store.remove('invoices', x.id);
+            VH.confirm('حذف الفاتورة', 'ستُحذف الفاتورة ' + VH.esc(x.no) + ' (' + VH.moneyTxt(x.total) + ') نهائياً، ويُحذف قيدها المحاسبي وتتغيّر الأرصدة.', 'حذف', function () {
+              VH.finance.removeInvoice(x.id);
               VH.store.log('حذف فاتورة', x.no + ' — ' + VH.moneyTxt(x.total), d.id);
               VH.toast('حُذفت الفاتورة', 'warn'); re();
             }, true);

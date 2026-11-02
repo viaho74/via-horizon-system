@@ -135,6 +135,21 @@ window.VH = window.VH || {};
       VH.statCard({ title: 'ضريبة المدخلات (على مشترياتك)', value: cur.input, cls: 'stat--out', desc: 'من فواتير المنصرف' }) +
       VH.statCard({ title: 'الصافي المستحق للهيئة', value: cur.due, cls: 'stat--net', desc: cur.due >= 0 ? 'يُسدَّد في الإقرار' : 'رصيد لصالحك' }) +
       '</div>' +
+
+      // المطابقة مع حسابَي الضريبة في دفتر اليومية
+      (function () {
+        var g = VH.acc.vatReturn({ from: cur.from, to: cur.to });
+        var okO = Math.abs(g.output - cur.output) < 0.01, okI = Math.abs(g.input - cur.input) < 0.01;
+        return '<div class="strip ' + (okO && okI ? 'strip--info' : 'strip--warn') + '" style="margin:0 0 14px">' +
+          '<span class="strip__ico">' + (okO && okI ? '✓' : '!') + '</span><div>' +
+          '<b>' + (okO && okI ? 'مطابق لحسابات الضريبة في الدفاتر' : 'فرق بين الفواتير وحسابات الضريبة — أعيدي ترحيل الدفاتر') + '</b>' +
+          '<small>ح/ ' + VH.esc(VH.acc.acc('vatOut')) + ' ضريبة المخرجات ' + VH.fmt(g.output) + ' ر.س · ' +
+          'ح/ ' + VH.esc(VH.acc.acc('vatIn')) + ' ضريبة المدخلات ' + VH.fmt(g.input) + ' ر.س · ' +
+          'الصافي ' + VH.fmt(g.due) + ' ر.س</small></div><span class="sp"></span>' +
+          '<a class="btn btn--sm btn--ghost" href="#/f/ledger/' + VH.esc(VH.acc.acc('vatOut')) + '">كشف المخرجات</a>' +
+          '<a class="btn btn--sm btn--ghost" href="#/f/ledger/' + VH.esc(VH.acc.acc('vatIn')) + '">كشف المدخلات</a>' +
+          '</div>';
+      })() +
       (cur.list.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم</th><th>التاريخ</th><th>النوع</th><th>الطرف</th>' +
         '<th>قبل الضريبة</th><th>الضريبة</th><th>الإجمالي</th></tr></thead><tbody>' +
         cur.list.sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); }).map(function (i) {
@@ -191,7 +206,9 @@ window.VH = window.VH || {};
     var d = inv.dealId ? VH.store.get('deals', inv.dealId) : null;
     var when = (inv.date || VH.today()) + 'T12:00:00Z';
 
-    var ttl = inv.direction === 'in' ? 'فاتورة ضريبية مبسّطة' : 'سند صرف';
+    // فاتورة ضريبية كاملة متى عُرف الرقم الضريبي للمشتري، وإلا مبسّطة
+    var full = inv.direction === 'in' && String(inv.partyTaxNo || '').length >= 10;
+    var ttl = inv.direction === 'in' ? (full ? 'فاتورة ضريبية' : 'فاتورة ضريبية مبسّطة') : 'سند صرف';
     area.innerHTML =
       R.letterhead(inv.date, ttl + ' رقم ' + inv.no) +
       '<div class="sheet"><div class="inv">' +
@@ -203,6 +220,7 @@ window.VH = window.VH || {};
 
         '<h4>بيانات ' + (inv.direction === 'in' ? 'العميل' : 'المورّد') + '</h4>' +
         '<table><tr><th style="width:32%">الاسم</th><td>' + VH.esc(inv.party) + '</td></tr>' +
+        (inv.partyTaxNo ? '<tr><th>الرقم الضريبي</th><td class="num">' + VH.esc(inv.partyTaxNo) + '</td></tr>' : '') +
         (inv.partyPhone ? '<tr><th>الجوال</th><td class="num">' + VH.esc(inv.partyPhone) + '</td></tr>' : '') +
         (d ? '<tr><th>رقم الصفقة</th><td class="num">' + VH.esc(d.code) + '</td></tr>' +
           '<tr><th>تفاصيل الخدمة</th><td>' + VH.esc((d.contract || {}).carType || '') + ' — ' + VH.esc((d.contract || {}).region || '') +

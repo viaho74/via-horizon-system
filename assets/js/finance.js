@@ -78,6 +78,17 @@ window.VH = window.VH || {};
   };
 
   /* ---------------- إنشاء فاتورة ---------------- */
+  /** يحفظ الفاتورة ويُرحّل قيدها المحاسبي في خطوة واحدة */
+  F.saveInvoice = function (inv) {
+    var saved = VH.store.save('invoices', inv);
+    try { VH.acc.postInvoice(saved); } catch (e) { console.error('تعذّر ترحيل قيد الفاتورة', e); }
+    return saved;
+  };
+  F.removeInvoice = function (id) {
+    try { VH.acc.unpost('invoice', id); } catch (e) { console.error(e); }
+    VH.store.remove('invoices', id);
+  };
+
   F.createInvoice = function (o) {
     var inv = Object.assign({
       no: VH.store.nextInvoiceNo(), date: VH.today(), direction: 'in', party: '', partyType: '',
@@ -85,9 +96,40 @@ window.VH = window.VH || {};
       status: 'unpaid', paidDate: '', method: '', category: '', dealId: '', dealCode: '',
       createdBy: (VH.auth.user() || {}).name || ''
     }, o);
-    VH.store.save('invoices', inv);
+    F.saveInvoice(inv);
     VH.store.log('فاتورة', (inv.direction === 'in' ? 'وارد ' : 'منصرف ') + inv.no + ' — ' + VH.moneyTxt(inv.total) + ' — ' + inv.party, inv.id);
     return inv;
+  };
+
+  /** معاينة القيد الذي ستُرحَّل به الفاتورة (قبل الحفظ) */
+  F.journalPreview = function (o) {
+    if (!VH.acc || !VH.acc.ready()) return '<p class="small muted" style="margin:0">شجرة الحسابات غير مهيّأة بعد.</p>';
+    var isIn = o.direction === 'in';
+    var net = VH.num(o.amountBeforeVat), vat = VH.num(o.vatAmount), tot = VH.num(o.total), paid = VH.num(o.paidAmount);
+    var acc = VH.acc.acc.bind(VH.acc);
+    var incomeAcc = acc(VH.acc.slotForCategory(o.category, o.direction)) || acc(isIn ? 'sales' : 'otherExp');
+    var ap = o.category === 'إيجار سيارة' ? (acc('apRent') || acc('ap')) : acc('ap');
+    var rows = isIn
+      ? [[acc('ar'), tot, 0], [incomeAcc, 0, net], [acc('vatOut'), 0, vat]]
+      : [[incomeAcc, net, 0], [acc('vatIn'), vat, 0], [ap, 0, tot]];
+    if (paid > 0.009) {
+      var cash = VH.acc.cashAcc(o.method);
+      rows = rows.concat(isIn ? [[cash, paid, 0], [acc('ar'), 0, paid]] : [[ap, paid, 0], [cash, 0, paid]]);
+    }
+    rows = rows.filter(function (x) { return x[0] && (x[1] || x[2]); });
+    if (!rows.length) return '<p class="small muted" style="margin:0">أدخلي المبلغ ليظهر القيد.</p>';
+    var td = 0, tc = 0;
+    var body = rows.map(function (x) {
+      td += x[1]; tc += x[2];
+      return '<tr><td class="n">' + VH.esc(x[0]) + '</td><td>' + VH.esc(VH.acc.name(x[0])) + '</td>' +
+        '<td class="n">' + (x[1] ? VH.fmt(x[1]) : '') + '</td><td class="n">' + (x[2] ? VH.fmt(x[2]) : '') + '</td></tr>';
+    }).join('');
+    var ok = Math.abs(VH.round2(td) - VH.round2(tc)) < 0.01;
+    return '<div class="tbl-wrap"><table class="tbl" style="min-width:420px"><thead><tr>' +
+      '<th style="width:120px">الحساب</th><th>اسم الحساب</th><th style="width:100px">مدين</th><th style="width:100px">دائن</th>' +
+      '</tr></thead><tbody>' + body + '</tbody><tfoot><tr style="background:var(--vh-surface-2);font-weight:700">' +
+      '<th colspan="2">' + (ok ? 'متوازن ✓' : 'غير متوازن ✗') + '</th>' +
+      '<th class="n">' + VH.fmt(td) + '</th><th class="n">' + VH.fmt(tc) + '</th></tr></tfoot></table></div>';
   };
 
   /* ---------------- نافذة الفاتورة ---------------- */
@@ -106,6 +148,11 @@ window.VH = window.VH || {};
       { name: 'date', label: 'تاريخ الفاتورة', type: 'date', required: true, value: i.date || VH.today() },
       { name: 'party', label: 'اسم الطرف (العميل / المورّد)', required: true, value: i.party || (deal ? (deal.orgName || deal.clientName) : '') },
       { name: 'partyPhone', label: 'جوال الطرف', type: 'tel', value: i.partyPhone || (deal ? deal.clientPhone : '') },
+      {
+        name: 'partyTaxNo', label: 'الرقم الضريبي للطرف', value: i.partyTaxNo || (deal ? deal.clientTaxNo : ''),
+        attrs: ' dir="ltr" inputmode="numeric" maxlength="15"',
+        hint: 'يُطبع في الفاتورة الضريبية — مطلوب للفاتورة بين منشأتين (15 رقماً)'
+      },
       { name: 'category', label: 'التصنيف', type: 'select', required: true, options: cats.map(function (c) { return { v: c, t: c }; }), value: i.category },
       {
         name: 'dealId', label: 'ربط بصفقة (اختياري)', type: 'select',
@@ -139,6 +186,12 @@ window.VH = window.VH || {};
       {
         name: '_preview', type: 'html', full: true,
         html: '<div class="strip strip--info" style="margin:0"><span class="strip__ico">∑</span><div id="invPrev"><b>—</b></div></div>'
+      },
+      {
+        name: '_jr', type: 'html', full: true,
+        html: '<label style="font-size:.82rem;font-weight:600;color:var(--vh-navy)">القيد المحاسبي ' +
+          '<span class="hint" style="font-weight:400">— يُرحَّل تلقائياً على شجرة الحسابات عند الحفظ</span></label>' +
+          '<div id="invJr"></div>'
       }
     ];
 
@@ -175,6 +228,13 @@ window.VH = window.VH || {};
             if (want.indexOf(cur) > -1) sel.value = cur;
           }
           bd.querySelector('[data-f=paidDate]').closest('.f').style.opacity = v.status === 'unpaid' ? '.5' : '1';
+          // معاينة القيد الذي سيُرحَّل بهذه المدخلات
+          var jrBox = bd.querySelector('#invJr');
+          if (jrBox) jrBox.innerHTML = F.journalPreview({
+            direction: v.direction, category: v.category, party: v.party, method: v.method,
+            amountBeforeVat: r.before, vatAmount: r.vat, vatRate: r.rate, total: r.total,
+            paidAmount: VH.num(pa.value), description: v.description
+          });
         }
         bd.addEventListener('input', calc); bd.addEventListener('change', calc); calc();
       },
@@ -190,6 +250,7 @@ window.VH = window.VH || {};
             }
             var obj = Object.assign({}, existing || {}, {
               direction: v.direction, date: v.date, party: v.party, partyPhone: v.partyPhone,
+              partyTaxNo: String(v.partyTaxNo || '').replace(/\D/g, ''),
               category: v.category, dealId: v.dealId, dealCode: d ? d.code : '',
               description: v.description, amountBeforeVat: r.before, vatRate: r.rate, vatAmount: r.vat,
               total: r.total, vatIncluded: true,
@@ -199,7 +260,7 @@ window.VH = window.VH || {};
             F.applyPaid(obj, v.status === 'paid' ? r.total : (v.status === 'unpaid' ? 0 : v.paidAmount));
             if (!obj.no) obj.no = VH.store.nextInvoiceNo();
             if (!obj.createdBy) obj.createdBy = (VH.auth.user() || {}).name || '';
-            VH.store.save('invoices', obj);
+            F.saveInvoice(obj);
             VH.store.log(existing ? 'تعديل فاتورة' : 'فاتورة',
               (obj.direction === 'in' ? 'وارد ' : 'منصرف ') + obj.no + ' — ' + VH.moneyTxt(obj.total) + ' — ' + obj.party, obj.id);
             close(); VH.toast('حُفظت الفاتورة ' + obj.no, 'ok');
@@ -348,7 +409,7 @@ window.VH = window.VH || {};
                 createdBy: (VH.auth.user() || {}).name || ''
               };
               F.applyPaid(obj, x.status === 'paid' ? r.total : (x.status === 'unpaid' ? 0 : x.paidAmount));
-              VH.store.save('invoices', obj);
+              F.saveInvoice(obj);
             });
             VH.store.log('دفعة فواتير', 'أُدخلت ' + list.length + ' فاتورة دفعة واحدة' + (dl ? ' — ' + dl.code : ''), dl ? dl.id : '');
             close();
@@ -413,7 +474,7 @@ window.VH = window.VH || {};
             inv.paidDate = v.status === 'unpaid' ? '' : v.paidDate;
             inv.method = v.status === 'unpaid' ? inv.method : v.method;
             F.applyPaid(inv, amt);
-            VH.store.save('invoices', inv);
+            F.saveInvoice(inv);
             VH.store.log('سداد', inv.no + ' — ' + VH.payText(inv.status) + ' ' + VH.moneyTxt(amt) + ' من ' + VH.moneyTxt(tot), inv.id);
             close();
             VH.toast(inv.status === 'paid' ? 'سُجّل السداد الكامل' : inv.status === 'partial'
@@ -640,7 +701,7 @@ window.VH = window.VH || {};
           b.addEventListener('click', function () {
             var inv = VH.store.get('invoices', b.getAttribute('data-del-inv'));
             VH.confirm('حذف الفاتورة', 'ستُحذف الفاتورة ' + VH.esc(inv.no) + ' نهائياً وتتغيّر الأرصدة.', 'حذف', function () {
-              VH.store.remove('invoices', inv.id);
+              F.removeInvoice(inv.id);
               VH.store.log('حذف فاتورة', inv.no + ' — ' + VH.moneyTxt(inv.total));
               VH.toast('حُذفت الفاتورة', 'warn'); VH.app.render();
             }, true);
