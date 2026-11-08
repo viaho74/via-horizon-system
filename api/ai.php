@@ -47,6 +47,8 @@ function httpGet(string $url): ?string {
 $keyFile = __DIR__ . '/ai-key.php';
 $apiKey  = is_file($keyFile) ? (string) include $keyFile : (string) getenv('ANTHROPIC_API_KEY');
 $apiKey  = trim($apiKey);
+// المفتاح الحقيقي يبدأ بـ sk-؛ أي نص آخر (كالعبارة الإرشادية) يعني «لم يُضَف بعد»
+if (strpos($apiKey, 'sk-') !== 0) $apiKey = '';
 
 if (($_GET['ping'] ?? '') !== '') {
     echo json_encode(['ok' => true, 'enabled' => $apiKey !== '', 'model' => MODEL], JSON_UNESCAPED_UNICODE);

@@ -436,12 +436,13 @@ window.VH = window.VH || {};
             hint.innerHTML = '<span class="muted">تعذّر الوصول إلى <span class="num">api/ai.php</span> على الخادم. ' +
               'تأكّدي من رفع مجلد <span class="num">api</span> مع النظام.</span>';
           } else {
-            st.className = 'badge b-gold'; st.textContent = 'بانتظار التفعيل';
-            hint.innerHTML = '<b>لتفعيله:</b> احصلي على مفتاح من <span class="num">console.anthropic.com</span> ← API Keys، ' +
-              'ثم أنشئي على الخادم ملفاً باسم <span class="num">api/ai-key.php</span> محتواه سطر واحد:' +
-              '<br><code class="num" style="display:inline-block;background:var(--vh-surface-2);padding:4px 10px;border-radius:6px;margin-top:6px">' +
-              '&lt;?php return \'sk-ant-...\';</code>' +
-              '<br><span class="muted">المفتاح يبقى على الخادم ولا يظهر في المتصفح إطلاقاً.</span>';
+            st.className = 'badge b-gold'; st.textContent = 'بانتظار المفتاح';
+            hint.innerHTML = '<b>خطوة واحدة متبقية:</b> ملف المفتاح جاهز على الخادم، ولم يبقَ إلا لصق المفتاح فيه.' +
+              '<ol style="margin:8px 0 0;padding-inline-start:20px">' +
+              '<li>افتحي <span class="num">console.anthropic.com</span> ← API Keys ← Create Key وانسخي المفتاح (يبدأ بـ <span class="num">sk-ant-</span>).</li>' +
+              '<li>في مدير ملفات هوستنجر افتحي <span class="num">vh-rs7we927/api/ai-key.php</span> للتعديل.</li>' +
+              '<li>استبدلي <span class="num">PASTE_YOUR_ANTHROPIC_KEY_HERE</span> بالمفتاح واحفظي.</li>' +
+              '</ol><span class="muted">يُفعَّل المساعد فوراً بعد الحفظ. المفتاح يبقى على الخادم ولا يظهر في المتصفح إطلاقاً.</span>';
           }
         });
 
