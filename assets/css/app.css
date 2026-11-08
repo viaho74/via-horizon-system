@@ -371,13 +371,15 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
   -webkit-print-color-adjust:exact; print-color-adjust:exact;
 }
 /* قيمتا «التاريخ» و«الموضوع» تُكتبان فوق السطرين المنقّطين في الكليشة */
+/* مواضع سطرَي «التاريخ» و«الموضوع» مقيسة على نموذج الورق الرسمي:
+   السطران المنقّطان يمتدان من 2.4% إلى 33.9% عرضاً، وعلى ارتفاع 10.94% و13.12% */
 .sheet-bg b{
-  position:absolute; left:3%; width:27%; text-align:right; direction:rtl;
+  position:absolute; left:2.5%; width:28.5%; text-align:right; direction:rtl;
   font-family:var(--vh-font-ar); font-size:10pt; font-weight:600; color:#082B49;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
 }
-.sheet-bg .s-date{ top:10% }
-.sheet-bg .s-subj{ top:12.2% }
+.sheet-bg .s-date{ top:9.5% }
+.sheet-bg .s-subj{ top:11.7% }
 
 @media print{
   body{ background:#fff }
