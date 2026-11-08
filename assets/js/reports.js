@@ -375,6 +375,14 @@ window.VH = window.VH || {};
       (isMgr ? '<div style="margin-top:14px"><button class="btn btn--gold btn--sm" data-save-perm>حفظ الصلاحية</button></div>' : '') + '</div>' +
       '</div>' +
 
+      '<div class="card"><div class="card__h"><h2>المساعد الذكي</h2><span class="sp"></span>' +
+      '<span id="aiState" class="badge b-gray">جارٍ الفحص…</span></div>' +
+      '<p class="small muted" style="margin:0 0 10px">يقرأ الصور ويعبّئ النماذج بدلاً من الإدخال اليدوي: ' +
+      'عقد مكتب الإيجار وفاتورته · هوية السائق · فواتير الصرف · استمارة السيارة · طلب العميل.</p>' +
+      '<p class="small muted" style="margin:0">زر «✨ اقرأ من صورة» يظهر داخل كل نافذة من هذه النوافذ. ' +
+      'المساعد يعبّئ فقط — المراجعة والحفظ بيدك، والحقول التي يعبّئها تبقى معلَّمة بلون ذهبي حتى تراجعيها.</p>' +
+      '<div id="aiHint" class="small" style="margin-top:10px"></div></div>' +
+
       '<div class="card"><div class="card__h"><h2>الموظفون</h2><span class="sp"></span>' +
       (isMgr ? '<button class="btn btn--sm btn--ghost" data-add-emp>+ إضافة موظف</button>' : '') + '</div>' +
       '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الاسم</th><th>المعرّف</th><th>بريد الدخول (Firebase)</th><th>الدور</th><th></th></tr></thead><tbody>' +
@@ -416,6 +424,26 @@ window.VH = window.VH || {};
       mount: function (root) {
         function q(id) { var e = root.querySelector(id); return e ? e.value.trim() : ''; }
         function on(sel, fn) { var e = root.querySelector(sel); if (e) e.addEventListener('click', fn); }
+
+        // حالة المساعد الذكي
+        var st = root.querySelector('#aiState'), hint = root.querySelector('#aiHint');
+        if (st) VH.ai.status().then(function (a) {
+          if (a.enabled) {
+            st.className = 'badge b-green'; st.textContent = 'مفعّل';
+            hint.innerHTML = '<span class="muted">النموذج المستخدم: <span class="num">' + VH.esc(a.model) + '</span></span>';
+          } else if (a.offline) {
+            st.className = 'badge b-gray'; st.textContent = 'غير متاح';
+            hint.innerHTML = '<span class="muted">تعذّر الوصول إلى <span class="num">api/ai.php</span> على الخادم. ' +
+              'تأكّدي من رفع مجلد <span class="num">api</span> مع النظام.</span>';
+          } else {
+            st.className = 'badge b-gold'; st.textContent = 'بانتظار التفعيل';
+            hint.innerHTML = '<b>لتفعيله:</b> احصلي على مفتاح من <span class="num">console.anthropic.com</span> ← API Keys، ' +
+              'ثم أنشئي على الخادم ملفاً باسم <span class="num">api/ai-key.php</span> محتواه سطر واحد:' +
+              '<br><code class="num" style="display:inline-block;background:var(--vh-surface-2);padding:4px 10px;border-radius:6px;margin-top:6px">' +
+              '&lt;?php return \'sk-ant-...\';</code>' +
+              '<br><span class="muted">المفتاح يبقى على الخادم ولا يظهر في المتصفح إطلاقاً.</span>';
+          }
+        });
 
         on('[data-save-co]', function () {
           VH.store.saveSettings({

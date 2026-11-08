@@ -1,0 +1,7 @@
+# حماية ملف المفتاح: لا يُفتح من المتصفح بأي حال
+<FilesMatch "^ai-key\.php$">
+  Require all denied
+</FilesMatch>
+
+Options -Indexes
+Header set Cache-Control "no-store"

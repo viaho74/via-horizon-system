@@ -299,6 +299,10 @@ window.VH = window.VH || {};
     var fields = [
       { name: 'orgName', label: 'اسم الجهة', value: q.orgName || d.orgName, required: true },
       {
+        name: '_ai', type: 'html', full: true,
+        html: VH.ai.buttonHtml('aiQuote', 'أرفقي صورة طلب العميل (واتساب أو جدول) ودعي المساعد يعبّئ البنود')
+      },
+      {
         name: '_items', type: 'html', full: true,
         html: '<label style="font-size:.82rem;font-weight:600;color:var(--vh-navy)">بنود عرض السعر <span class="req">*</span> ' +
           '<span class="hint" style="font-weight:400">— سطر لكل بند: البند والوصف والكمية والسعر، والإجمالي يُحسب تلقائياً. ' +
@@ -430,6 +434,49 @@ window.VH = window.VH || {};
       body: VH.form.render(fields),
       onOpen: function (bd) {
         renderItems(bd);
+
+        // المساعد الذكي: يقرأ طلب العميل ويبني بنود عرض السعر
+        VH.ai.bind(bd, {
+          id: 'aiQuote', task: 'request',
+          hint: 'نحن شركة نقل وتأجير سيارات. البنود المعتادة: سيارات تشغيل، كيلومترات زائدة، أجرة سائق، رسوم سطحة، إصلاحات.',
+          onFields: function (f) {
+            var n = 0;
+            n += VH.ai.set(bd, 'orgName', f.orgName);
+            if (f.notes) n += VH.ai.set(bd, 'notes', f.notes);
+            // بيانات العميل تُحدَّث في الصفقة نفسها بعد الحفظ
+            if (f.clientName && !d.clientName) { d.clientName = f.clientName; n++; }
+            if (f.clientPhone && !d.clientPhone) { d.clientPhone = VH.ai.phone(f.clientPhone); n++; }
+            if (f.clientEmail && !d.clientEmail) { d.clientEmail = f.clientEmail; n++; }
+
+            var list = (f.items || []).filter(function (x) { return x && (x.name || x.qty); });
+            if (list.length) {
+              items = list.map(function (x) {
+                var type = VH.ai.matchOption(x.name, CARS);
+                var isCar = !!type || /سيار|باص|جمس|تورس|سوبربان|هايس|كامري|يوكن/.test(String(x.name || ''));
+                return {
+                  isCar: isCar,
+                  name: isCar ? (type || CARS[0]) : String(x.name || '').trim(),
+                  desc: [x.withDriver, (x.fromCity && x.toCity) ? ('من ' + x.fromCity + ' إلى ' + x.toCity) : '']
+                    .filter(Boolean).join(' — '),
+                  qty: VH.ai.num(x.qty) || 1,
+                  unit: VH.ai.num(x.unit),
+                  withDriver: /بدون/.test(String(x.withDriver || '')) ? 'بدون سائق' : 'بسائق',
+                  fromCity: VH.ai.matchOption(x.fromCity, REGIONS),
+                  toCity: VH.ai.matchOption(x.toCity, REGIONS),
+                  startDate: VH.ai.date(x.startDate),
+                  endDate: VH.ai.date(x.endDate)
+                };
+              });
+              renderItems(bd);
+              bd.querySelectorAll('#qItemsBox .qin').forEach(function (el) {
+                if (el.value) el.classList.add('ai-filled');
+              });
+              n += items.length;
+            }
+            return n;
+          }
+        });
+
         bd.addEventListener('input', function () { recalc(bd); });
         bd.addEventListener('change', function (e) {
           // تبديل «سيارة تشغيل» أو «تنبيه بلا مبلغ» يعيد بناء السطر بحقوله المناسبة
@@ -691,6 +738,10 @@ window.VH = window.VH || {};
         value: r.status || 'جارٍ التفاوض'
       },
       {
+        name: '_ai', type: 'html', full: true,
+        html: VH.ai.buttonHtml('aiOffice', 'صوّري عقد المكتب أو فاتورته ودعي المساعد يعبّئ')
+      },
+      {
         name: '_cars', type: 'html', full: true,
         html: '<label style="font-size:.82rem;font-weight:600;color:var(--vh-navy)">بيانات كل سيارة على حدة <span class="req">*</span> ' +
           '<span class="hint" style="font-weight:400">— ' + cars.length + ' سيارة حسب العقد، ولكل سيارة مكتبها ولوحتها وإيجارها وحد الكيلومترات</span></label>' +
@@ -763,6 +814,43 @@ window.VH = window.VH || {};
         }
         bd._readCars = read;
         render();
+
+        // المساعد الذكي: يقرأ عقد المكتب أو فاتورته ويعبّئ أسطر السيارات
+        VH.ai.bind(bd, {
+          id: 'aiOffice', task: 'rental',
+          hint: 'عدد السيارات في هذه الصفقة ' + cars.length + '، ومدة الإيجار ' + days + ' يوم.',
+          onFields: function (f) {
+            var n = 0;
+            n += VH.ai.set(bd, 'notes', f.notes);
+            var list = f.cars && f.cars.length ? f.cars : [f];
+            var trs = bd.querySelectorAll('#rCarsBox tbody tr');
+            // لو جاءت سيارات أكثر من الأسطر الحالية نضيف أسطراً
+            if (list.length > trs.length) {
+              cars = read();
+              while (cars.length < list.length) {
+                cars.push({ id: VH.uid('car'), carType: CARS[0], withDriver: 'بسائق', officeName: '', officePhone: '', plate: '', rentPerDay: '' });
+              }
+              render();
+              trs = bd.querySelectorAll('#rCarsBox tbody tr');
+            }
+            list.forEach(function (c, i) {
+              var tr = trs[i]; if (!tr) return;
+              var sel = tr.querySelector('[data-k=carType]');
+              var opts = [].map.call(sel.options, function (o) { return o.value; });
+              var m = VH.ai.matchOption(c.carType, opts);
+              if (m) { sel.value = m; sel.classList.add('ai-filled'); n++; }
+              n += VH.ai.setCell(tr, 'officeName', f.officeName || c.officeName);
+              n += VH.ai.setCell(tr, 'officePhone', VH.ai.phone(f.officePhone || c.officePhone));
+              n += VH.ai.setCell(tr, 'plate', c.plate);
+              n += VH.ai.setCell(tr, 'rentPerDay', VH.ai.num(c.rentPerDay));
+              n += VH.ai.setCell(tr, 'kmAllowed', VH.ai.num(c.kmAllowed));
+              n += VH.ai.setCell(tr, 'kmExtraRate', VH.ai.num(c.kmExtraRate));
+            });
+            recalc();
+            return n;
+          }
+        });
+
         bd.addEventListener('input', recalc);
         bd.addEventListener('click', function (e) {
           if (e.target.closest('[data-add-car]')) {
@@ -902,6 +990,10 @@ window.VH = window.VH || {};
     var carOpts = CARS.slice(); if (v0.carType && carOpts.indexOf(v0.carType) < 0) carOpts.unshift(v0.carType);
     var fields = [
       {
+        name: '_ai', type: 'html', full: true,
+        html: VH.ai.buttonHtml('aiVeh', 'صوّري استمارة السيارة ودعي المساعد يعبّئ')
+      },
+      {
         name: 'carType', label: 'نوع السيارة', type: 'select', required: true,
         options: carOpts.map(function (x) { return { v: x, t: x }; }),
         value: v0.carType || (((d.contract || {}).items || [])[0] || {}).carType || (d.contract || {}).carType,
@@ -922,6 +1014,22 @@ window.VH = window.VH || {};
     VH.modal({
       title: (vid ? 'بيانات السيارة' : 'إضافة سيارة') + ' — ' + VH.esc(d.code),
       body: VH.form.render(fields),
+      onOpen: function (bd) {
+        VH.ai.bind(bd, {
+          id: 'aiVeh', task: 'vehicle',
+          onFields: function (f) {
+            var n = 0;
+            var sel = bd.querySelector('[data-f=carType]');
+            var m = VH.ai.matchOption(f.carType, [].map.call(sel.options, function (o) { return o.value; }));
+            if (m) { sel.value = m; sel.classList.add('ai-filled'); n++; }
+            n += VH.ai.set(bd, 'plate', f.plate);
+            if (f.notes || f.model) {
+              n += VH.ai.set(bd, 'notes', [f.model ? 'موديل ' + f.model : '', f.notes].filter(Boolean).join(' · '));
+            }
+            return n;
+          }
+        });
+      },
       actions: [
         {
           label: vid ? 'حفظ' : 'إضافة', cls: 'btn--gold', onClick: function (close, bd) {
@@ -958,6 +1066,10 @@ window.VH = window.VH || {};
     var drivers = VH.store.driverList();
     var cDays = VH.num((d.contract || {}).days) || VH.daysBetween((d.contract || {}).startDate, (d.contract || {}).endDate) || 0;
     var fields = [
+      {
+        name: '_ai', type: 'html', full: true,
+        html: VH.ai.buttonHtml('aiDriver', 'صوّري هوية السائق أو إقامته ودعي المساعد يعبّئ')
+      },
       {
         name: '_pick', label: 'اختيار سائق مسجّل', type: 'select',
         options: [{ v: '', t: '— سائق جديد —' }].concat(drivers.map(function (x) { return { v: x.id, t: x.name + (x.phone ? ' · ' + x.phone : '') }; })),
@@ -1006,6 +1118,22 @@ window.VH = window.VH || {};
           wage();
         });
         bd.addEventListener('input', wage); bd.addEventListener('change', wage); wage();
+
+        VH.ai.bind(bd, {
+          id: 'aiDriver', task: 'driver',
+          onFields: function (f) {
+            var n = 0;
+            n += VH.ai.set(bd, 'name', f.name);
+            n += VH.ai.set(bd, 'idNo', String(f.idNo || '').replace(/\D/g, ''));
+            n += VH.ai.set(bd, 'phone', VH.ai.phone(f.phone));
+            if (f.nationality) {
+              n += VH.ai.set(bd, 'nationality', /غير/.test(f.nationality) ? 'غير سعودي' : 'سعودي');
+            }
+            if (f.notes) n += VH.ai.set(bd, 'notes', f.notes);
+            wage();
+            return n;
+          }
+        });
       },
       actions: [
         {
@@ -1127,6 +1255,10 @@ window.VH = window.VH || {};
     var dr0 = d.driver || {};
     var days = VH.num(dr0.days) || VH.num((d.contract || {}).days) || 0, wage = VH.num(dr0.dailyWage) || 0;
     var fields = [
+      {
+        name: '_ai', type: 'html', full: true,
+        html: VH.ai.buttonHtml('aiExp', 'صوّري الفاتورة ودعي المساعد يعبّئ')
+      },
       { name: 'kind', label: 'نوع المصروف', type: 'select', required: true, options: KINDS.map(function (k) { return { v: k, t: k }; }), value: presetKind || 'بنزين' },
       { name: 'note', label: 'الوصف (مطلوب مع «أخرى»)', value: presetKind === 'يومية السواق' ? 'يومية السواق ' + days + ' يوم × ' + wage : '' },
       { name: 'amount', label: 'القيمة (شاملة الضريبة)', type: 'number', required: true, value: presetKind === 'يومية السواق' ? VH.round2(wage * days) : '' },
@@ -1157,6 +1289,21 @@ window.VH = window.VH || {};
           pa.closest('.f').style.opacity = v.payStatus === 'partial' ? '1' : '.6';
         }
         bd.addEventListener('input', sync); bd.addEventListener('change', sync); sync();
+
+        VH.ai.bind(bd, {
+          id: 'aiExp', task: 'expense',
+          onFields: function (f) {
+            var n = 0;
+            var k = VH.ai.matchOption(f.kind, KINDS);
+            if (k) n += VH.ai.set(bd, 'kind', k);
+            var note = [f.note, f.vendor ? 'من ' + f.vendor : ''].filter(Boolean).join(' — ');
+            n += VH.ai.set(bd, 'note', note);
+            n += VH.ai.set(bd, 'amount', VH.ai.num(f.amount));
+            n += VH.ai.set(bd, 'date', VH.ai.date(f.date));
+            sync();
+            return n;
+          }
+        });
       },
       actions: [
         {

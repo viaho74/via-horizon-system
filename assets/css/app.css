@@ -342,6 +342,25 @@ table.tbl{ width:100%; border-collapse:collapse; font-size:.87rem; min-width:640
 .toast.ok{ background:var(--ok) } .toast.bad{ background:var(--bad) } .toast.warn{ background:var(--warn); color:#fff }
 @keyframes tin{ from{ opacity:0; transform:translateY(10px) } }
 
+/* ===================== المساعد الذكي ===================== */
+.ai-box{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  background:linear-gradient(90deg, rgba(14,110,120,.07), rgba(214,173,85,.07));
+  border:1px dashed var(--vh-teal); border-radius:12px; padding:10px 14px;
+}
+.ai-box .ai-msg{ line-height:1.7 }
+.ai-ok{ color:var(--ok); font-weight:600 }
+.ai-err{ color:var(--bad); font-weight:600 }
+.ai-miss{ color:var(--warn) }
+.ai-wait{ color:var(--vh-teal-700); font-weight:600 }
+.ai-wait::after{ content:'…'; animation:aidots 1.2s steps(4,end) infinite }
+@keyframes aidots{ 0%{opacity:.3} 50%{opacity:1} 100%{opacity:.3} }
+/* الحقول التي عبّأها المساعد تبقى معلَّمة حتى تُراجَع */
+.ai-filled{
+  background:#FFFBEA !important; border-color:var(--vh-gold) !important;
+  box-shadow:inset 0 0 0 1px rgba(214,173,85,.35);
+}
+
 /* ===================== الطباعة — على كليشة فيا هورايزن الرسمية ===================== */
 .print-area{ display:none }
 
